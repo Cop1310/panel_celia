@@ -52,3 +52,10 @@ Abre `familia.html`, elige quién eres, escribe el correo y la contraseña de Fi
 - Mensajes: salen en la tablet en ≤ 6 s y la pantalla parpadea 45 s (amarillo/blanco, sin sonido). Al tocar la pantalla deja de parpadear. Los borráis desde el móvil.
 - El horario editado llega a la tablet en ≤ 1 minuto.
 - La tablet se recarga sola cada noche a las 3:30 para coger versiones nuevas.
+
+
+## Novedades v1.1
+- Sin botones rápidos: solo se escribe el texto.
+- Los mensajes ya NO hacen parpadear la pantalla. En la pestaña Mensajes hay botones **Parpadear** y **Parar** (se apaga solo a los 10 min; tocar la pantalla de la tablet lo calla para esa alerta).
+- **Aviso en lugar de la rutina**: sustituye el texto automático del horario por el que escribas, hasta que pulses *Quitar aviso*.
+- IMPORTANTE: hay que volver a pegar `reglas.json` en Firebase > Realtime Database > Reglas y pulsar Publicar (añade `aviso` y `alerta`).

@@ -1,4 +1,4 @@
-var CACHE='panel-celia-v1';
+var CACHE='panel-celia-v2';
 var FILES=['./','index.html','familia.html','comun.js','firebase-config.js','manifest.json','manifest-familia.json','icon-192.png','icon-512.png','icon-familia-192.png','icon-familia-512.png'];
 self.addEventListener('install',function(e){
   e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll(FILES)}).then(function(){return self.skipWaiting()}));

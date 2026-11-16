@@ -31,8 +31,9 @@ textarea{min-height:92px;resize:vertical;font-size:18px}
 .btn.bad{background:var(--bad)}
 .btn:disabled{opacity:.5}
 .row{display:flex;gap:8px;align-items:center}
-.quick{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 12px}
-.q{padding:9px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);font-size:14px}
+.row .btn{flex:1}
+.btn.warn{background:var(--warn)}
+.st{font-size:14px;margin:8px 0 2px}
 .msg{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;background:var(--card)}
 .msg .m1{font-size:13px;color:var(--mut)}
 .msg .m2{font-size:17px;font-weight:600;margin:2px 0 6px;word-wrap:break-word}
@@ -79,11 +80,27 @@ textarea{min-height:92px;resize:vertical;font-size:18px}
     <div id="p1">
       <div class="card">
         <textarea id="txt" maxlength="300" placeholder="Escribe aquí el mensaje para mamá…"></textarea>
-        <div class="quick" id="quick"></div>
         <div class="err" id="serr"></div>
         <button class="btn" id="bsend">Enviar a la tablet</button>
       </div>
-      <div class="row" style="justify-content:space-between"><b>En la tablet ahora</b><button class="del" id="bdelall">Borrar todos</button></div>
+      <div class="card">
+        <b>Parpadeo de la pantalla</b>
+        <div class="hint">Para llamar su atención. Sigue parpadeando hasta que pulses Parar (o 10 min como máximo).</div>
+        <div class="row" style="margin-top:8px"><button class="btn warn" id="bfl">⚡ Parpadear</button><button class="btn sec" id="bfl0">Parar</button></div>
+        <div class="st" id="flst"></div>
+      </div>
+      <div class="card">
+        <b>Aviso en lugar de la rutina</b>
+        <div class="hint">Sustituye el mensaje automático del horario (“Es hora de desayunar”…) por el que escribas aquí, hasta que lo quites.</div>
+        <div class="st" id="avst"></div>
+        <select id="avico" style="margin-top:8px"><option value="📢">📢 Aviso</option><option value="🩺">🩺 Médico</option><option value="🚗">🚗 Vienen a buscarte</option><option value="📞">📞 Llamada</option><option value="🍽">🍽 Comida</option><option value="💊">💊 Medicación</option><option value="🛏">🛏 Descanso</option><option value="🏠">🏠 En casa</option><option value="">Sin icono</option></select>
+        <textarea id="avtxt" maxlength="200" placeholder="Ej.: Prepárate, que viene David a buscarte para ir al médico."></textarea>
+        <div class="err" id="averr"></div>
+        <button class="btn" id="bav">Poner este aviso en la tablet</button>
+        <div style="height:8px"></div>
+        <button class="btn sec" id="bav0">Quitar aviso (vuelve el automático)</button>
+      </div>
+      <div class="row" style="justify-content:space-between"><b>Mensajes en la tablet</b><button class="del" id="bdelall">Borrar todos</button></div>
       <div id="lista"></div>
       <div class="hint" style="margin-top:10px"><a href="#" id="bsal">Salir (cerrar sesión de <span id="qn"></span>)</a></div>
     </div>
@@ -123,14 +140,7 @@ function show(id,on){$(id).className=$(id).className.replace(/\bhidden\b/g,'').r
 
 var sess=null,agenda=null,diaSel=null,msgs=[],bloques=[];
 try{sess=JSON.parse(ls('pcf_sess')||'null')}catch(e){}
-var QUICK=[
- ['📞','Mamá, llámame por teléfono.'],
- ['🛏','Mamá, no te acuestes todavía, es pronto.'],
- ['🌙','Mamá, todavía es de noche. Vuelve a la cama, aún no ha amanecido.'],
- ['🍽','Mamá, es hora de comer.'],
- ['🍽','Mamá, es hora de cenar.'],
- ['❤','Mamá, todo está bien. Estamos pendientes de ti.']
-];
+var aviso=null,alerta=null;
 
 /* ---------- sesión (Firebase Auth REST) ---------- */
 function authErr(j){
@@ -189,15 +199,10 @@ function vista(){
 var iniciado=false,timers=[];
 function iniciar(){
   if(iniciado)return;iniciado=true;
-  var q=$('quick'),h='',i;
-  for(i=0;i<QUICK.length;i++)h+='<button class="q" data-i="'+i+'">'+QUICK[i][0]+' '+esc(QUICK[i][1].replace(/^Mamá, /,''))+'</button>';
-  q.innerHTML=h;
-  var bs=q.getElementsByTagName('button');
-  for(i=0;i<bs.length;i++)bs[i].onclick=function(){$('txt').value=QUICK[parseInt(this.getAttribute('data-i'),10)][1];$('txt').focus()};
-  pollMsgs();pollEstado();cargaAgenda();
-  timers.push(setInterval(function(){if(!document.hidden)pollMsgs()},5000));
+  pollMsgs();pollExtra();pollEstado();cargaAgenda();
+  timers.push(setInterval(function(){if(!document.hidden){pollMsgs();pollExtra()}},5000));
   timers.push(setInterval(function(){if(!document.hidden)pollEstado()},15000));
-  document.addEventListener('visibilitychange',function(){if(!document.hidden){pollMsgs();pollEstado()}});
+  document.addEventListener('visibilitychange',function(){if(!document.hidden){pollMsgs();pollExtra();pollEstado()}});
 }
 $('bin').onclick=function(){
   var em=$('em').value.replace(/^\s+|\s+$/g,'').toLowerCase(),pw=$('pw').value;
@@ -229,6 +234,38 @@ function pollEstado(){
     e.innerHTML=pto+' Tablet conectada '+hace+bat;
   });
 }
+
+/* ---------- parpadeo y aviso ---------- */
+function alertaOn(){return !!(alerta&&alerta.on&&alerta.ts&&(Date.now()-alerta.ts)<10*60*1000)}
+function pintaExtra(){
+  if(alertaOn())$('flst').innerHTML='🔴 <b>Parpadeando</b> (lo activó '+esc(alerta.de||'?')+' a las '+hhmm(alerta.ts).replace(/^hoy /,'')+')';
+  else $('flst').innerHTML='⚪ Parado';
+  var a='';
+  if(aviso&&aviso.texto)a='🟠 <b>Aviso activo</b> ('+esc(aviso.de||'?')+', '+hhmm(aviso.ts||0)+'):<br>“'+esc(aviso.texto)+'”';
+  else{
+    var cur=null;try{cur=agenda?PC.ahora(agenda,new Date()).cur:null}catch(e){}
+    a='⚪ La tablet muestra el aviso automático del horario'+(cur?': “'+cur.t+'”':'.');
+  }
+  $('avst').innerHTML=a;
+}
+function pollExtra(){
+  PC.xhr('GET',PC.url('aviso'),null,function(ok,j){if(!ok)return;aviso=(j&&typeof j==='object'&&j.texto)?j:null;pintaExtra()});
+  PC.xhr('GET',PC.url('alerta'),null,function(ok,j){if(!ok)return;alerta=(j&&typeof j==='object')?j:null;pintaExtra()});
+}
+function pon(path,val,msg){
+  escribe('PUT',path,val,function(ok,err){if(!ok){toast(err);return}toast(msg);pollExtra()});
+}
+$('bfl').onclick=function(){pon('alerta',{on:true,de:sess.who,ts:{'.sv':'timestamp'}},'Parpadeando ✓ (en unos segundos)')};
+$('bfl0').onclick=function(){pon('alerta',{on:false,de:sess.who,ts:{'.sv':'timestamp'}},'Parado ✓')};
+$('bav').onclick=function(){
+  var t=$('avtxt').value.replace(/^\s+|\s+$/g,'');
+  if(!t){$('averr').textContent='Escribe el aviso.';return}
+  $('averr').textContent='';
+  pon('aviso',{de:sess.who,texto:t,icono:$('avico').value,ts:{'.sv':'timestamp'}},'Aviso puesto ✓ (en unos segundos)');
+};
+$('bav0').onclick=function(){
+  escribe('DELETE','aviso',undefined,function(ok,err){if(!ok){toast(err);return}toast('Aviso quitado ✓');pollExtra()});
+};
 
 /* ---------- mensajes ---------- */
 function pollMsgs(){
@@ -277,7 +314,7 @@ function cargaAgenda(){
   PC.xhr('GET',PC.url('agenda'),null,function(ok,j){
     agenda=(ok&&j&&j.sem)?{sem:j.sem,fest:j.fest||{}}:PC.DEF();
     if(!diaSel){var k=PC.KEYS[new Date().getDay()];diaSel=k}
-    pintaChips();pintaDia();pintaFest();
+    pintaChips();pintaDia();pintaFest();pintaExtra();
   });
 }
 function pintaChips(){

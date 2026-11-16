@@ -26,6 +26,8 @@ body.noche #hm{color:#FFE082}
 body.noche #per{color:#FFE082}
 #ahora{background:#E3F2FD;border:.6vmin solid #1F4E79;border-radius:3vmin;padding:1.2vmin 2vmin;text-align:center;display:block}
 body.noche #ahora{background:#1B2C66;border-color:#FFE082}
+#ahora.av{background:#FFF3E0;border-color:#C62828}
+body.noche #ahora.av{background:#4A1F1F;border-color:#FFB74D}
 #ahora .t0{font-weight:700;color:#46597F;line-height:1.1}
 body.noche #ahora .t0{color:#B8C4E8}
 #aico{line-height:1}
@@ -67,15 +69,14 @@ body.noche .m.nuevo .de{color:#5D4037}
 <script src="comun.js"></script>
 <script>
 (function(){
-var VERSION='1.0';
+var VERSION='1.1';
 function $(id){return document.getElementById(id)}
 function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
-var agenda=null,msgs=[],lastOk=0,lastTick='',flashTimer=null,flashEnd=0,seen=[],firstFetch=true,fails=0;
+var agenda=null,msgs=[],lastOk=0,lastTick='',flashTimer=null,flashDismissed=0,aviso=null,alerta=null,fails=0;
 try{agenda=JSON.parse(ls('pc_agenda')||'null')}catch(e){}
 if(!agenda||!agenda.sem)agenda=PC.DEF();
 try{msgs=JSON.parse(ls('pc_msgs')||'[]')}catch(e){msgs=[]}
-try{seen=JSON.parse(ls('pc_vistos')||'[]')}catch(e){seen=[]}
-if(!seen||seen.length===undefined)seen=[];
+try{aviso=JSON.parse(ls('pc_aviso')||'null')}catch(e){aviso=null}
 
 function place(id,x,y,w,h){var e=$(id);e.style.left=Math.round(x)+'px';e.style.top=Math.round(y)+'px';e.style.width=Math.round(w)+'px';e.style.height=Math.round(h)+'px'}
 function setFs(id,px){$(id).style.fontSize=Math.round(px)+'px'}
@@ -107,14 +108,17 @@ function layout(){
 function nowObj(){return PC.ahora(agenda,new Date())}
 function renderAhora(){
   var d=new Date(),o=PC.ahora(agenda,d),cur=o.cur,nx=o.next;
+  var av=(aviso&&aviso.texto)?aviso:null;
   document.body.className=(cur&&cur.n)?'noche':'dia';
+  $('ahora').className=av?'blk av':'blk';
+  $('t0').innerHTML=av?'AVISO':'AHORA';
   var box=$('ahora'),ah=box.clientHeight,aw=box.clientWidth,land=L.land;
   $('t0').style.fontSize=Math.round(Math.min(ah*0.09,aw*0.045))+'px';
-  $('aico').innerHTML=cur&&cur.i?cur.i:'';
+  $('aico').innerHTML=av?esc(av.icono||''):(cur&&cur.i?cur.i:'');
   $('aico').style.fontSize=Math.round(Math.min(ah*(land?0.24:0.20),aw*0.13))+'px';
-  $('desp').innerHTML=nx?('Después, '+(PC.h12(parseInt(nx.h,10))===1?'a la ':'a las ')+PC.hmFull(nx.h)+(o.manana?' (mañana)':'')+': '+esc(nx.t)):'';
+  $('desp').innerHTML=(nx&&!av)?('Después, '+(PC.h12(parseInt(nx.h,10))===1?'a la ':'a las ')+PC.hmFull(nx.h)+(o.manana?' (mañana)':'')+': '+esc(nx.t)):'';
   $('desp').style.fontSize=Math.round(Math.min(ah*0.075,aw*0.038))+'px';
-  var tx=$('atxt');tx.innerHTML=cur?cur.t:'';
+  var tx=$('atxt');tx.innerHTML=av?esc(av.texto):(cur?cur.t:'');
   var libre=ah-$('t0').offsetHeight-$('aico').offsetHeight-$('desp').offsetHeight-Math.round(L.H*0.03)-6;
   var s=Math.min(ah*0.30,aw*0.13);tx.style.fontSize=Math.round(s)+'px';
   var g=0;while(tx.offsetHeight>libre&&s>14&&g++<80){s-=2;tx.style.fontSize=Math.round(s)+'px'}
@@ -174,29 +178,42 @@ function renderEstado(){
 }
 function render(){renderFecha();renderAhora();renderMsgs();renderEstado()}
 
-/* ---- parpadeo ---- */
-function flashMsg(m){
-  var f=$('flash');
-  $('fd').innerHTML='Mensaje de '+esc(m.de);
-  $('ft').innerHTML=esc(m.texto);
+/* ---- parpadeo (solo cuando la familia lo activa) ---- */
+function flashTexto(){
+  var m=null,i;
+  if(aviso&&aviso.texto)return {d:'Aviso de '+esc(aviso.de||''),t:esc(aviso.texto)};
+  for(i=0;i<msgs.length;i++)if(!m||msgs[i].ts>m.ts)m=msgs[i];
+  if(m&&(Date.now()-m.ts)<30*60*1000)return {d:'Mensaje de '+esc(m.de),t:esc(m.texto)};
+  return {d:'',t:'Mira la pantalla'};
+}
+function startFlash(){
+  var f=$('flash'),c=flashTexto();
+  $('fd').innerHTML=c.d;$('ft').innerHTML=c.t;
   var u=Math.min(L.W,L.H);
   $('fd').style.fontSize=Math.round(u*0.07)+'px';
   var s=u*0.10;$('ft').style.fontSize=Math.round(s)+'px';
   f.style.display='block';f.className='a';
   var guard=0;while($('ft').scrollHeight+$('fd').offsetHeight>L.H*0.78&&s>18&&guard++<60){s-=3;$('ft').style.fontSize=Math.round(s)+'px'}
-  flashEnd=Date.now()+45000;
   if(flashTimer)clearInterval(flashTimer);
   var t=0;
   flashTimer=setInterval(function(){
     t++;f.className=(t%2)?'b':'a';
-    if(Date.now()>flashEnd)stopFlash();
+    if(!alertaActiva())stopFlash();
   },700);
 }
 function stopFlash(){
   if(flashTimer){clearInterval(flashTimer);flashTimer=null}
   $('flash').style.display='none';
 }
-$('flash').onclick=stopFlash;
+/* la alerta se apaga sola a los 10 min por si nadie la para */
+function alertaActiva(){return !!(alerta&&alerta.on&&alerta.ts&&(Date.now()-alerta.ts)<10*60*1000)}
+function applyAlerta(){
+  var on=alertaActiva();
+  if(on&&!flashTimer&&alerta.ts!==flashDismissed)startFlash();
+  if(!on&&flashTimer)stopFlash();
+}
+/* tocar la pantalla la deja tranquila (solo esa alerta) */
+$('flash').onclick=function(){flashDismissed=alerta?alerta.ts:0;stopFlash()};
 
 /* ---- red ---- */
 function pollMsgs(){
@@ -207,13 +224,22 @@ function pollMsgs(){
     var list=[],k;
     if(j&&typeof j==='object'){for(k in j)if(j.hasOwnProperty(k)&&j[k]&&j[k].texto)list.push({id:k,de:j[k].de||'',texto:j[k].texto,ts:j[k].ts||Date.now()})}
     msgs=list;ls('pc_msgs',JSON.stringify(list));
-    /* ¿mensajes nuevos? */
-    var nuevos=list.filter(function(m){return seen.indexOf(m.id)<0&&(Date.now()-m.ts)<10*60*1000});
-    list.forEach(function(m){if(seen.indexOf(m.id)<0)seen.push(m.id)});
-    if(seen.length>200)seen=seen.slice(-200);
-    ls('pc_vistos',JSON.stringify(seen));
-    if(nuevos.length){nuevos.sort(function(a,b){return b.ts-a.ts});flashMsg(nuevos[0])}
     renderMsgs();renderEstado();
+  });
+}
+function pollAviso(){
+  if(!PC.configurado())return;
+  PC.xhr('GET',PC.url('aviso'),null,function(ok,j){
+    if(!ok)return;
+    aviso=(j&&typeof j==='object'&&j.texto)?j:null;
+    ls('pc_aviso',JSON.stringify(aviso));renderAhora();
+  });
+}
+function pollAlerta(){
+  if(!PC.configurado())return;
+  PC.xhr('GET',PC.url('alerta'),null,function(ok,j){
+    if(!ok)return;
+    alerta=(j&&typeof j==='object')?j:null;applyAlerta();
   });
 }
 function pollAgenda(){
@@ -250,8 +276,8 @@ window.addEventListener('orientationchange',function(){setTimeout(layout,300)});
 layout();
 setInterval(tick,1000);
 setInterval(renderEstado,5000);
-pollAgenda();pollMsgs();heartbeat();
-setInterval(pollMsgs,6000);
+pollAgenda();pollMsgs();pollAviso();pollAlerta();heartbeat();
+setInterval(function(){pollMsgs();pollAviso();pollAlerta()},6000);
 setInterval(pollAgenda,60000);
 setInterval(heartbeat,60000);
 

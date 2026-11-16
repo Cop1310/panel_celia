@@ -13,6 +13,14 @@
       "agenda": {
         ".write": "auth != null && (auth.token.email === 'cop1310@hotmail.com' || auth.token.email === 'davidop374@hotmail.com' || auth.token.email === 'danielortizperez1982@gmail.com')"
       },
+      "aviso": {
+        ".write": "auth != null && (auth.token.email === 'cop1310@hotmail.com' || auth.token.email === 'davidop374@hotmail.com' || auth.token.email === 'danielortizperez1982@gmail.com')",
+        ".validate": "newData.hasChildren(['de','texto','ts']) && newData.child('texto').isString() && newData.child('texto').val().length <= 200"
+      },
+      "alerta": {
+        ".write": "auth != null && (auth.token.email === 'cop1310@hotmail.com' || auth.token.email === 'davidop374@hotmail.com' || auth.token.email === 'danielortizperez1982@gmail.com')",
+        ".validate": "newData.hasChildren(['on','ts']) && newData.child('on').isBoolean()"
+      },
       "latido": {
         ".write": true,
         ".validate": "newData.hasChildren(['ts'])"
