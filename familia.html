@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1F4E79">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Panel Celia">
+<link rel="manifest" href="manifest-familia.json">
+<link rel="icon" href="icon-familia-192.png">
+<link rel="apple-touch-icon" href="icon-familia-192.png">
+<title>Panel de Celia · Familia</title>
+<style>
+:root{--bg:#F4F6FA;--card:#fff;--ink:#14213D;--mut:#5B6B8C;--line:#D5DBE8;--pri:#1F4E79;--ok:#2E7D32;--warn:#E65100;--bad:#C62828}
+@media (prefers-color-scheme:dark){:root{--bg:#0F1628;--card:#18223D;--ink:#EEF2FF;--mut:#9FB0D6;--line:#2C3963;--pri:#6FA8E8}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.wrap{max-width:640px;margin:0 auto;padding:0 16px 40px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+h1{font-size:20px;margin:16px 0 4px}
+.sub{color:var(--mut);font-size:14px;margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0}
+.estado{display:block;font-size:14px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);margin:8px 0}
+.tabs{display:flex;gap:8px;margin:10px 0}
+.tab{flex:1;padding:12px 8px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:16px;font-weight:600}
+.tab.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+button,select,input,textarea{font:inherit;color:var(--ink)}
+input,select,textarea{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card);margin:4px 0 10px}
+textarea{min-height:92px;resize:vertical;font-size:18px}
+.btn{display:block;width:100%;padding:14px;border:0;border-radius:12px;background:var(--pri);color:#fff;font-weight:700;font-size:17px}
+.btn.sec{background:transparent;color:var(--pri);border:1px solid var(--pri)}
+.btn.bad{background:var(--bad)}
+.btn:disabled{opacity:.5}
+.row{display:flex;gap:8px;align-items:center}
+.quick{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 12px}
+.q{padding:9px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);font-size:14px}
+.msg{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;background:var(--card)}
+.msg .m1{font-size:13px;color:var(--mut)}
+.msg .m2{font-size:17px;font-weight:600;margin:2px 0 6px;word-wrap:break-word}
+.del{border:1px solid var(--bad);color:var(--bad);background:transparent;border-radius:10px;padding:6px 12px;font-size:14px}
+.chips{display:flex;gap:6px;margin:8px 0}
+.chip{flex:1;padding:10px 0;text-align:center;border-radius:10px;border:1px solid var(--line);background:var(--card);font-weight:700}
+.chip.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.blk{border:1px solid var(--line);border-radius:12px;padding:10px;margin:8px 0;background:var(--card)}
+.blk .r1{display:flex;gap:8px}
+.blk input[type=time]{width:150px;flex:none}
+.blk select{width:70px;flex:none}
+.blk input,.blk select{margin:0 0 8px}
+.nl{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--mut)}
+.nl input{width:auto;margin:0}
+.toast{position:fixed;left:16px;right:16px;bottom:18px;background:#14213D;color:#fff;padding:12px 14px;border-radius:12px;text-align:center;z-index:10;display:none}
+.hint{font-size:13px;color:var(--mut)}
+.err{color:var(--bad);font-size:14px;min-height:20px}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Panel de Celia · Familia</h1>
+  <div class="sub">Mensajes para la tablet de mamá y horario del día.</div>
+
+  <div id="sinconf" class="card hidden"><b>Falta configurar Firebase.</b><br>Rellena <code>firebase-config.js</code> (mira el LEEME) y vuelve a abrir esta página.</div>
+
+  <div id="vlogin" class="card hidden">
+    <b>Entrar</b>
+    <label class="hint">¿Quién eres?</label>
+    <select id="who"><option>César</option><option>David</option><option>Dani</option></select>
+    <label class="hint">Correo (el que creaste en Firebase)</label>
+    <input id="em" type="email" autocomplete="username" autocapitalize="off" autocorrect="off">
+    <label class="hint">Contraseña</label>
+    <input id="pw" type="password" autocomplete="current-password">
+    <div class="err" id="lerr"></div>
+    <button class="btn" id="bin">Entrar</button>
+  </div>
+
+  <div id="vmain" class="hidden">
+    <div class="estado" id="estado">Tablet: comprobando…</div>
+    <div class="tabs"><button class="tab on" id="t1">Mensajes</button><button class="tab" id="t2">Horario</button></div>
+
+    <div id="p1">
+      <div class="card">
+        <textarea id="txt" maxlength="300" placeholder="Escribe aquí el mensaje para mamá…"></textarea>
+        <div class="quick" id="quick"></div>
+        <div class="err" id="serr"></div>
+        <button class="btn" id="bsend">Enviar a la tablet</button>
+      </div>
+      <div class="row" style="justify-content:space-between"><b>En la tablet ahora</b><button class="del" id="bdelall">Borrar todos</button></div>
+      <div id="lista"></div>
+      <div class="hint" style="margin-top:10px"><a href="#" id="bsal">Salir (cerrar sesión de <span id="qn"></span>)</a></div>
+    </div>
+
+    <div id="p2" class="hidden">
+      <div class="hint">Elige un día, cambia las franjas y pulsa Guardar. La tablet usa la franja de la hora más reciente. La franja “noche” pone la pantalla oscura.</div>
+      <div class="chips" id="chips"></div>
+      <div id="bloques"></div>
+      <button class="btn sec" id="badd">+ Añadir franja</button>
+      <div style="height:8px"></div>
+      <button class="btn" id="bsave">Guardar este día</button>
+      <div style="height:8px"></div>
+      <button class="btn sec" id="bcopy">Copiar este día a lunes–viernes</button>
+
+      <div class="card">
+        <b>Festivos y días especiales</b>
+        <div class="hint">Un día festivo entre semana se trata como sábado o domingo.</div>
+        <input id="fdate" type="date">
+        <select id="fcomo"><option value="sab">Como un sábado (sin centro de día)</option><option value="dom">Como un domingo (misa)</option></select>
+        <button class="btn" id="bfest">Añadir ese día</button>
+        <div id="flist"></div>
+      </div>
+      <button class="btn sec" id="bdef">Restaurar horario por defecto</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="firebase-config.js"></script>
+<script src="comun.js"></script>
+<script>
+(function(){
+function $(id){return document.getElementById(id)}
+function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){return null}}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function toast(t){var e=$('toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(function(){e.style.display='none'},2600)}
+function show(id,on){$(id).className=$(id).className.replace(/\bhidden\b/g,'').replace(/\s+$/,'')+(on?'':' hidden')}
+
+var sess=null,agenda=null,diaSel=null,msgs=[],bloques=[];
+try{sess=JSON.parse(ls('pcf_sess')||'null')}catch(e){}
+var QUICK=[
+ ['📞','Mamá, llámame por teléfono.'],
+ ['🛏','Mamá, no te acuestes todavía, es pronto.'],
+ ['🌙','Mamá, todavía es de noche. Vuelve a la cama, aún no ha amanecido.'],
+ ['🍽','Mamá, es hora de comer.'],
+ ['🍽','Mamá, es hora de cenar.'],
+ ['❤','Mamá, todo está bien. Estamos pendientes de ti.']
+];
+
+/* ---------- sesión (Firebase Auth REST) ---------- */
+function authErr(j){
+  var m=j&&j.error&&j.error.message||'';
+  if(m.indexOf('INVALID_PASSWORD')>=0||m.indexOf('INVALID_LOGIN')>=0||m.indexOf('EMAIL_NOT_FOUND')>=0)return 'Correo o contraseña incorrectos.';
+  if(m.indexOf('TOO_MANY')>=0)return 'Demasiados intentos. Espera un poco.';
+  if(m.indexOf('API key')>=0||m.indexOf('API_KEY')>=0)return 'La apiKey de firebase-config.js no es correcta (revisa letras como 0/O o l/I).';
+  if(m.indexOf('OPERATION_NOT_ALLOWED')>=0||m.indexOf('CONFIGURATION_NOT_FOUND')>=0)return 'En Firebase falta activar Authentication con Correo/contraseña.';
+  return 'No se pudo entrar. ¿Hay internet?';
+}
+function doLogin(who,email,pass,cb){
+  PC.xhr('POST',PC_CONFIG.authUrl+'?key='+encodeURIComponent(PC_CONFIG.apiKey),{email:email,password:pass,returnSecureToken:true},function(ok,j){
+    if(!ok||!j||!j.idToken){cb(authErr(j));return}
+    sess={who:who,email:j.email||email,idToken:j.idToken,refresh:j.refreshToken,exp:Date.now()+(parseInt(j.expiresIn,10)||3600)*1000};
+    ls('pcf_sess',JSON.stringify(sess));cb(null);
+  });
+}
+function postForm(url,body,cb){
+  var x=new XMLHttpRequest();
+  x.open('POST',url,true);x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');x.timeout=15000;
+  var fin=function(ok,t){var j=null;try{j=JSON.parse(t)}catch(e){}cb(ok,j)};
+  x.onload=function(){fin(x.status>=200&&x.status<300,x.responseText)};x.onerror=function(){fin(false,'')};x.ontimeout=function(){fin(false,'')};
+  x.send(body);
+}
+function getToken(cb){
+  if(!sess){cb(null);return}
+  if(sess.idToken&&Date.now()<sess.exp-90000){cb(sess.idToken);return}
+  postForm(PC_CONFIG.tokenUrl+'?key='+encodeURIComponent(PC_CONFIG.apiKey),'grant_type=refresh_token&refresh_token='+encodeURIComponent(sess.refresh),function(ok,j){
+    if(ok&&j&&j.id_token){
+      sess.idToken=j.id_token;sess.refresh=j.refresh_token||sess.refresh;sess.exp=Date.now()+(parseInt(j.expires_in,10)||3600)*1000;
+      ls('pcf_sess',JSON.stringify(sess));cb(sess.idToken);
+    }else{
+      /* sin red: reutilizar el token si aún no ha caducado del todo; si no, pedir entrar de nuevo */
+      if(j&&j.error){sess=null;ls('pcf_sess',null);vista();cb(null)}
+      else cb(sess.idToken||null);
+    }
+  });
+}
+function escribe(method,path,body,cb){
+  getToken(function(tok){
+    if(!tok){cb(false,'Necesitas entrar otra vez.');return}
+    PC.xhr(method,PC.url(path,tok),body,function(ok,j,st){
+      if(ok)cb(true,j);
+      else if(st===401||st===403)cb(false,'No tienes permiso: revisa que tu correo esté en las reglas de Firebase.');
+      else cb(false,'Sin conexión. Inténtalo otra vez.');
+    });
+  });
+}
+
+/* ---------- vistas ---------- */
+function vista(){
+  var conf=PC.configurado()&&PC_CONFIG.apiKey;
+  show('sinconf',!conf);show('vlogin',conf&&!sess);show('vmain',conf&&!!sess);
+  if(conf&&sess){$('qn').textContent=sess.who;iniciar()}
+}
+var iniciado=false,timers=[];
+function iniciar(){
+  if(iniciado)return;iniciado=true;
+  var q=$('quick'),h='',i;
+  for(i=0;i<QUICK.length;i++)h+='<button class="q" data-i="'+i+'">'+QUICK[i][0]+' '+esc(QUICK[i][1].replace(/^Mamá, /,''))+'</button>';
+  q.innerHTML=h;
+  var bs=q.getElementsByTagName('button');
+  for(i=0;i<bs.length;i++)bs[i].onclick=function(){$('txt').value=QUICK[parseInt(this.getAttribute('data-i'),10)][1];$('txt').focus()};
+  pollMsgs();pollEstado();cargaAgenda();
+  timers.push(setInterval(function(){if(!document.hidden)pollMsgs()},5000));
+  timers.push(setInterval(function(){if(!document.hidden)pollEstado()},15000));
+  document.addEventListener('visibilitychange',function(){if(!document.hidden){pollMsgs();pollEstado()}});
+}
+$('bin').onclick=function(){
+  var em=$('em').value.replace(/^\s+|\s+$/g,'').toLowerCase(),pw=$('pw').value;
+  if(!em||!pw){$('lerr').textContent='Escribe tu correo y tu contraseña.';return}
+  $('bin').disabled=true;$('lerr').textContent='';
+  doLogin($('who').value,em,pw,function(err){
+    $('bin').disabled=false;
+    if(err){$('lerr').textContent=err;return}
+    $('pw').value='';vista();
+  });
+};
+$('bsal').onclick=function(e){e.preventDefault();sess=null;ls('pcf_sess',null);iniciado=false;while(timers.length)clearInterval(timers.pop());vista()};
+$('t1').onclick=function(){tabSel(1)};$('t2').onclick=function(){tabSel(2)};
+function tabSel(n){
+  $('t1').className='tab'+(n===1?' on':'');$('t2').className='tab'+(n===2?' on':'');
+  show('p1',n===1);show('p2',n===2);
+}
+
+/* ---------- estado de la tablet ---------- */
+function pollEstado(){
+  PC.xhr('GET',PC.url('latido'),null,function(ok,j){
+    var e=$('estado');
+    if(!ok){e.innerHTML='Tablet: no se puede consultar (¿sin internet en tu móvil?)';return}
+    if(!j||!j.ts){e.innerHTML='🔴 Tablet: todavía no ha avisado nunca. ¿Está abierta la app?';return}
+    var min=Math.round((Date.now()-j.ts)/60000),bat='';
+    if(j.bat!==undefined&&j.bat!==null)bat=' · 🔋 '+j.bat+'%'+(j.cargando?' (enchufada)':' (¡sin enchufar!)');
+    var hace=min<1?'ahora mismo':(min<60?'hace '+min+' min':'hace '+Math.round(min/60)+' h');
+    var pto=min<=3?'🟢':(min<=15?'🟠':'🔴');
+    e.innerHTML=pto+' Tablet conectada '+hace+bat;
+  });
+}
+
+/* ---------- mensajes ---------- */
+function pollMsgs(){
+  PC.xhr('GET',PC.url('mensajes'),null,function(ok,j){
+    if(!ok)return;
+    var list=[],k;
+    if(j&&typeof j==='object')for(k in j)if(j.hasOwnProperty(k)&&j[k]&&j[k].texto)list.push({id:k,de:j[k].de||'',texto:j[k].texto,ts:j[k].ts||0});
+    list.sort(function(a,b){return b.ts-a.ts});
+    msgs=list;pintaLista();
+  });
+}
+function hhmm(ts){var d=new Date(ts);var hoy=PC.iso(d)===PC.iso(new Date());return (hoy?'hoy':PC.pad(d.getDate())+'/'+PC.pad(d.getMonth()+1))+' '+PC.pad(d.getHours())+':'+PC.pad(d.getMinutes())}
+function pintaLista(){
+  var h='',i,m;
+  if(!msgs.length)h='<div class="hint" style="margin:10px 0">No hay mensajes en la tablet.</div>';
+  for(i=0;i<msgs.length;i++){
+    m=msgs[i];
+    h+='<div class="msg"><div class="m1">'+esc(m.de)+' · '+hhmm(m.ts)+'</div><div class="m2">'+esc(m.texto)+'</div><button class="del" data-id="'+esc(m.id)+'">Borrar</button></div>';
+  }
+  $('lista').innerHTML=h;
+  var bs=$('lista').getElementsByTagName('button');
+  for(i=0;i<bs.length;i++)bs[i].onclick=function(){
+    var id=this.getAttribute('data-id'),self=this;self.disabled=true;
+    escribe('DELETE','mensajes/'+id,undefined,function(ok,err){if(!ok){toast(err);self.disabled=false}else{pollMsgs();toast('Borrado')}});
+  };
+  $('bdelall').style.display=msgs.length?'':'none';
+}
+$('bsend').onclick=function(){
+  var t=$('txt').value.replace(/^\s+|\s+$/g,'');
+  if(!t){$('serr').textContent='Escribe algo antes de enviar.';return}
+  $('serr').textContent='';$('bsend').disabled=true;
+  escribe('POST','mensajes',{de:sess.who,texto:t,ts:{'.sv':'timestamp'}},function(ok,err){
+    $('bsend').disabled=false;
+    if(!ok){$('serr').textContent=err;return}
+    $('txt').value='';toast('Enviado ✓ (sale en la tablet en unos segundos)');pollMsgs();
+  });
+};
+$('bdelall').onclick=function(){
+  if(!confirm('¿Borrar TODOS los mensajes de la tablet?'))return;
+  escribe('DELETE','mensajes',undefined,function(ok,err){if(!ok)toast(err);else{pollMsgs();toast('Borrados')}});
+};
+
+/* ---------- horario ---------- */
+var ICONOS=['☀','🍳','🏫','⛪','🍽','🏠','🌙','💊','🚶','📞','🛁','🛏'];
+function cargaAgenda(){
+  PC.xhr('GET',PC.url('agenda'),null,function(ok,j){
+    agenda=(ok&&j&&j.sem)?{sem:j.sem,fest:j.fest||{}}:PC.DEF();
+    if(!diaSel){var k=PC.KEYS[new Date().getDay()];diaSel=k}
+    pintaChips();pintaDia();pintaFest();
+  });
+}
+function pintaChips(){
+  var ord=['lun','mar','mie','jue','vie','sab','dom'],let_={lun:'L',mar:'M',mie:'X',jue:'J',vie:'V',sab:'S',dom:'D'},h='',i;
+  for(i=0;i<ord.length;i++)h+='<div class="chip'+(ord[i]===diaSel?' on':'')+'" data-k="'+ord[i]+'">'+let_[ord[i]]+'</div>';
+  $('chips').innerHTML=h;
+  var cs=$('chips').getElementsByTagName('div');
+  for(i=0;i<cs.length;i++)cs[i].onclick=function(){leeBloques();diaSel=this.getAttribute('data-k');pintaChips();pintaDia()};
+}
+function pintaDia(){
+  bloques=PC.sortBlocks(PC.arr(agenda.sem[diaSel])).map(function(b){return {h:b.h,t:b.t,i:b.i||'',n:b.n?1:0}});
+  pintaBloques();
+}
+function pintaBloques(){
+  var h='',i,j,o;
+  for(i=0;i<bloques.length;i++){
+    var b=bloques[i];o='';
+    for(j=0;j<ICONOS.length;j++)o+='<option'+(ICONOS[j]===b.i?' selected':'')+'>'+ICONOS[j]+'</option>';
+    if(b.i&&ICONOS.indexOf(b.i)<0)o+='<option selected>'+esc(b.i)+'</option>';
+    h+='<div class="blk" data-i="'+i+'"><div class="r1"><input type="time" class="fh" value="'+esc(b.h)+'"><select class="fi">'+o+'</select></div>'+
+       '<input type="text" class="ft" maxlength="80" value="'+esc(b.t)+'">'+
+       '<div class="r1" style="justify-content:space-between;align-items:center"><label class="nl"><input type="checkbox" class="fn"'+(b.n?' checked':'')+'> Noche (pantalla oscura, a dormir)</label><button class="del" data-del="'+i+'">Quitar</button></div></div>';
+  }
+  if(!bloques.length)h='<div class="hint">Este día no tiene franjas.</div>';
+  $('bloques').innerHTML=h;
+  var ds=$('bloques').getElementsByTagName('button');
+  for(i=0;i<ds.length;i++)ds[i].onclick=function(){leeBloques();bloques.splice(parseInt(this.getAttribute('data-del'),10),1);pintaBloques()};
+}
+function leeBloques(){
+  var els=$('bloques').getElementsByClassName('blk'),out=[],i,e,h,t;
+  for(i=0;i<els.length;i++){
+    e=els[i];h=e.getElementsByClassName('fh')[0].value;t=e.getElementsByClassName('ft')[0].value.replace(/^\s+|\s+$/g,'');
+    out.push({h:h,t:t,i:e.getElementsByClassName('fi')[0].value,n:e.getElementsByClassName('fn')[0].checked?1:0});
+  }
+  if(els.length||!bloques.length)bloques=out;
+  return bloques;
+}
+function limpia(L){
+  return PC.sortBlocks(L.filter(function(b){return b.h&&b.t})).map(function(b){var o={h:b.h,t:b.t};if(b.i)o.i=b.i;if(b.n)o.n=1;return o});
+}
+$('badd').onclick=function(){leeBloques();bloques.push({h:'12:00',t:'',i:'☀',n:0});pintaBloques()};
+$('bsave').onclick=function(){
+  var L=limpia(leeBloques());
+  if(!L.length){toast('Pon al menos una franja con hora y texto.');return}
+  escribe('PUT','agenda/sem/'+diaSel,L,function(ok,err){
+    if(!ok){toast(err);return}
+    agenda.sem[diaSel]=L;pintaDia();toast('Guardado ✓ (la tablet lo recoge en 1 minuto)');
+  });
+};
+$('bcopy').onclick=function(){
+  var L=limpia(leeBloques());
+  if(!L.length){toast('Pon al menos una franja con hora y texto.');return}
+  if(!confirm('¿Copiar este horario a lunes, martes, miércoles, jueves y viernes?'))return;
+  var ks=['lun','mar','mie','jue','vie'],n=0;
+  ks.forEach(function(k){escribe('PUT','agenda/sem/'+k,L,function(ok,err){n++;if(ok)agenda.sem[k]=L;if(n===ks.length){toast('Copiado ✓');pintaDia()}})});
+};
+$('bdef').onclick=function(){
+  if(!confirm('¿Restaurar TODO el horario por defecto? Se pierden tus cambios.'))return;
+  var d=PC.DEF();
+  escribe('PUT','agenda',{sem:d.sem,fest:agenda.fest||{}},function(ok,err){if(!ok){toast(err);return}agenda.sem=d.sem;pintaDia();toast('Horario restaurado')});
+};
+function pintaFest(){
+  var f=agenda.fest||{},ks=[],k,h='';
+  for(k in f)if(f.hasOwnProperty(k))ks.push(k);
+  ks.sort();
+  for(var i=0;i<ks.length;i++){
+    var p=ks[i].split('-');
+    h+='<div class="msg"><div class="m2" style="font-size:15px">'+p[2]+'/'+p[1]+'/'+p[0]+' · como '+PC.NOMBRE_KEY[f[ks[i]]]+'</div><button class="del" data-f="'+ks[i]+'">Quitar</button></div>';
+  }
+  $('flist').innerHTML=h||'<div class="hint" style="margin-top:8px">No hay días especiales.</div>';
+  var bs=$('flist').getElementsByTagName('button');
+  for(var j=0;j<bs.length;j++)bs[j].onclick=function(){
+    var key=this.getAttribute('data-f');
+    escribe('DELETE','agenda/fest/'+key,undefined,function(ok,err){if(!ok){toast(err);return}delete agenda.fest[key];pintaFest();toast('Quitado')});
+  };
+}
+$('bfest').onclick=function(){
+  var d=$('fdate').value;
+  if(!d){toast('Elige una fecha.');return}
+  var como=$('fcomo').value;
+  escribe('PUT','agenda/fest/'+d,como,function(ok,err){
+    if(!ok){toast(err);return}
+    if(!agenda.fest)agenda.fest={};agenda.fest[d]=como;pintaFest();toast('Añadido ✓');
+  });
+};
+(function(){var n=new Date();$('fdate').value=PC.iso(n)})();
+
+vista();
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){try{navigator.serviceWorker.register('sw.js')}catch(e){}}
+})();
+</script>
+</body>
+</html>

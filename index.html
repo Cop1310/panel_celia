@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#1F4E79">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Panel de Celia</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;font-family:"Segoe UI",Roboto,Arial,sans-serif;-webkit-user-select:none;user-select:none}
+body{background:#FFF8E7;color:#1B2A4A;-webkit-transition:background .6s;transition:background .6s}
+body.noche{background:#0B1740;color:#FFF}
+#app{position:absolute;left:0;top:0;right:0;bottom:0}
+.blk{position:absolute;overflow:hidden}
+#dia{font-weight:800;text-align:center;line-height:1.05;white-space:nowrap}
+#fl{text-align:center;line-height:1.1;color:#46597F;white-space:nowrap}
+body.noche #fl{color:#B8C4E8}
+#hm{font-weight:800;text-align:center;line-height:1;white-space:nowrap;color:#1F4E79}
+body.noche #hm{color:#FFE082}
+#per{text-align:center;font-weight:700;line-height:1.1;color:#1F4E79;white-space:nowrap}
+body.noche #per{color:#FFE082}
+#ahora{background:#E3F2FD;border:.6vmin solid #1F4E79;border-radius:3vmin;padding:1.2vmin 2vmin;text-align:center;display:block}
+body.noche #ahora{background:#1B2C66;border-color:#FFE082}
+#ahora .t0{font-weight:700;color:#46597F;line-height:1.1}
+body.noche #ahora .t0{color:#B8C4E8}
+#aico{line-height:1}
+#atxt{font-weight:800;line-height:1.12;color:#12294F}
+body.noche #atxt{color:#FFF}
+#desp{color:#46597F;line-height:1.15}
+body.noche #desp{color:#B8C4E8}
+#chat{background:#FFFFFF;border:.5vmin solid #B0BEC5;border-radius:3vmin;padding:1.2vmin 1.6vmin}
+body.noche #chat{background:#142355;border-color:#3D4F94}
+#chat .ct{font-weight:700;color:#46597F;line-height:1.2;margin-bottom:.6vmin}
+body.noche #chat .ct{color:#B8C4E8}
+#msgs{overflow:hidden}
+.m{border-left:1.2vmin solid #1F4E79;background:#F1F5FB;border-radius:1.6vmin;padding:.8vmin 1.6vmin;margin-bottom:1vmin}
+body.noche .m{background:#1F3070;border-left-color:#FFE082}
+.m.nuevo{background:#FFF59D;border-left-color:#E65100}
+body.noche .m.nuevo{background:#FFE082;color:#12294F}
+.m .de{font-weight:700;color:#46597F;line-height:1.2}
+body.noche .m .de{color:#B8C4E8}
+body.noche .m.nuevo .de{color:#5D4037}
+.m .tx{font-weight:700;line-height:1.15}
+#estado{position:absolute;right:2vmin;bottom:1vmin;font-size:2.4vmin;color:#C62828;font-weight:700}
+#flash{position:absolute;left:0;top:0;right:0;bottom:0;display:none;z-index:20;text-align:center;padding:4vmin;cursor:pointer}
+#flash.a{background:#FFD600;color:#1B2A4A}
+#flash.b{background:#FFFFFF;color:#C62828}
+#flash .fd{font-weight:800;line-height:1.1}
+#flash .ft{font-weight:800;line-height:1.15;margin-top:2vmin}
+#flash .fs{font-size:3vmin;margin-top:2vmin;opacity:.7}
+</style>
+</head>
+<body class="dia">
+<div id="app">
+  <div class="blk" id="bdia"><div id="dia"></div><div id="fl"></div></div>
+  <div class="blk" id="bhora"><div id="hm"></div><div id="per"></div></div>
+  <div class="blk" id="ahora"><div class="t0" id="t0">AHORA</div><div id="aico"></div><div id="atxt"></div><div id="desp"></div></div>
+  <div class="blk" id="chat"><div class="ct" id="ct">Mensajes de tu familia</div><div id="msgs"></div><div id="estado"></div></div>
+  <div id="flash"><div class="fd" id="fd"></div><div class="ft" id="ft"></div><div class="fs">Toca la pantalla para continuar</div></div>
+</div>
+<script src="firebase-config.js"></script>
+<script src="comun.js"></script>
+<script>
+(function(){
+var VERSION='1.0';
+function $(id){return document.getElementById(id)}
+function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
+var agenda=null,msgs=[],lastOk=0,lastTick='',flashTimer=null,flashEnd=0,seen=[],firstFetch=true,fails=0;
+try{agenda=JSON.parse(ls('pc_agenda')||'null')}catch(e){}
+if(!agenda||!agenda.sem)agenda=PC.DEF();
+try{msgs=JSON.parse(ls('pc_msgs')||'[]')}catch(e){msgs=[]}
+try{seen=JSON.parse(ls('pc_vistos')||'[]')}catch(e){seen=[]}
+if(!seen||seen.length===undefined)seen=[];
+
+function place(id,x,y,w,h){var e=$(id);e.style.left=Math.round(x)+'px';e.style.top=Math.round(y)+'px';e.style.width=Math.round(w)+'px';e.style.height=Math.round(h)+'px'}
+function setFs(id,px){$(id).style.fontSize=Math.round(px)+'px'}
+function fitText(box,maxPx,minPx){
+  var s=maxPx;box.style.fontSize=Math.round(s)+'px';
+  while(box.scrollHeight>box.clientHeight+1&&s>minPx){s-=2;box.style.fontSize=Math.round(s)+'px'}
+}
+var L={};
+function layout(){
+  var W=window.innerWidth,H=window.innerHeight,land=W>H*1.1,m=Math.round(Math.min(W,H)*0.02);
+  L.W=W;L.H=H;L.land=land;
+  var bx,by,bw,bh,hx,hy,hw,hh,ax,ay,aw,ah,cx,cy,cw,ch;
+  if(!land){
+    bx=m;bw=W-2*m;hx=m;hw=bw;ax=m;aw=bw;cx=m;cw=bw;
+    by=m;bh=H*0.13;hy=by+bh;hh=H*0.16;ay=hy+hh+m;ah=H*0.33;cy=ay+ah+m;ch=H-cy-m;
+  }else{
+    var lw=W*0.56;
+    bx=m;bw=lw-m;hx=m;hw=bw;ax=m;aw=bw;
+    by=m;bh=H*0.20;hy=by+bh;hh=H*0.27;ay=hy+hh+m;ah=H-ay-m;
+    cx=lw+m;cw=W-cx-m;cy=m;ch=H-2*m;
+  }
+  place('bdia',bx,by,bw,bh);place('bhora',hx,hy,hw,hh);place('ahora',ax,ay,aw,ah);place('chat',cx,cy,cw,ch);
+  var u=Math.min(W,H);
+  var dfs=Math.min(bh*0.55,bw*(land?0.20:0.16));
+  setFs('dia',dfs);setFs('fl',Math.min(bh*0.22,bw*0.058));
+  setFs('hm',Math.min(hh*0.70,hw*0.34));setFs('per',Math.min(hh*0.22,hw*0.07));
+  render();
+}
+function nowObj(){return PC.ahora(agenda,new Date())}
+function renderAhora(){
+  var d=new Date(),o=PC.ahora(agenda,d),cur=o.cur,nx=o.next;
+  document.body.className=(cur&&cur.n)?'noche':'dia';
+  var box=$('ahora'),ah=box.clientHeight,aw=box.clientWidth,land=L.land;
+  $('t0').style.fontSize=Math.round(Math.min(ah*0.09,aw*0.045))+'px';
+  $('aico').innerHTML=cur&&cur.i?cur.i:'';
+  $('aico').style.fontSize=Math.round(Math.min(ah*(land?0.24:0.20),aw*0.13))+'px';
+  $('desp').innerHTML=nx?('Después, '+(PC.h12(parseInt(nx.h,10))===1?'a la ':'a las ')+PC.hmFull(nx.h)+(o.manana?' (mañana)':'')+': '+esc(nx.t)):'';
+  $('desp').style.fontSize=Math.round(Math.min(ah*0.075,aw*0.038))+'px';
+  var tx=$('atxt');tx.innerHTML=cur?cur.t:'';
+  var libre=ah-$('t0').offsetHeight-$('aico').offsetHeight-$('desp').offsetHeight-Math.round(L.H*0.03)-6;
+  var s=Math.min(ah*0.30,aw*0.13);tx.style.fontSize=Math.round(s)+'px';
+  var g=0;while(tx.offsetHeight>libre&&s>14&&g++<80){s-=2;tx.style.fontSize=Math.round(s)+'px'}
+}
+function renderFecha(){
+  var d=new Date(),h=d.getHours();
+  $('dia').innerHTML=PC.DIAS_C[d.getDay()];
+  $('fl').innerHTML=PC.fechaLarga(d);
+  $('hm').innerHTML=PC.h12(h)+':'+PC.pad(d.getMinutes());
+  $('per').innerHTML=PC.periodo(h);
+}
+function quienDia(ts){
+  var d=new Date(ts),n=new Date(),a=PC.iso(d),b=PC.iso(n);
+  if(a===b)return '';
+  var y=new Date(n.getFullYear(),n.getMonth(),n.getDate()-1,12,0);
+  if(a===PC.iso(y))return 'ayer, ';
+  return PC.DIAS[d.getDay()]+' '+d.getDate()+', ';
+}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function renderMsgs(){
+  var box=$('msgs'),W=L.W,H=L.H,ch=$('chat').clientHeight,cw=$('chat').clientWidth;
+  var ct=$('ct');ct.style.fontSize=Math.round(Math.min(ch*0.06,cw*0.055))+'px';
+  var avail=ch-ct.offsetHeight-Math.min(W,H)*0.05;
+  box.style.height=Math.max(40,avail)+'px';
+  if(!PC.configurado()){box.innerHTML='<div class="m"><div class="tx" style="font-size:'+Math.round(Math.min(W,H)*0.035)+'px;color:#78909C">Los mensajes aparecerán aquí.</div></div>';return}
+  var L2=msgs.slice().sort(function(a,b){return b.ts-a.ts});
+  if(!L2.length){box.innerHTML='<div class="m"><div class="tx" style="font-size:'+Math.round(Math.min(W,H)*0.04)+'px;color:#78909C">No hay mensajes nuevos.</div></div>';return}
+  var base=Math.min(ch*0.11,cw*0.075),fs=base,out,k,n=Math.min(L2.length,8);
+  function build(count,f){
+    var h='',i,m,nuevo;
+    for(i=0;i<count;i++){
+      m=L2[i];nuevo=(Date.now()-m.ts)<10*60*1000;
+      var d=new Date(m.ts),hh=PC.hm12(PC.pad(d.getHours())+':'+PC.pad(d.getMinutes()))+' '+PC.periodo(d.getHours());
+      h+='<div class="m'+(nuevo?' nuevo':'')+'"><div class="de" style="font-size:'+Math.round(f*0.62)+'px">'+esc(m.de)+' · '+quienDia(m.ts)+hh+'</div><div class="tx" style="font-size:'+Math.round(f)+'px">'+esc(m.texto)+'</div></div>';
+    }
+    return h;
+  }
+  /* primero reducir letra, luego quitar los más antiguos */
+  while(n>=1){
+    fs=base;
+    while(true){
+      box.innerHTML=build(n,fs);
+      if(box.scrollHeight<=box.clientHeight+1||fs<=Math.max(16,base*0.55))break;
+      fs-=2;
+    }
+    if(box.scrollHeight<=box.clientHeight+1)break;
+    n--;
+  }
+  if(n<1){box.innerHTML=build(1,Math.max(16,base*0.55))}
+}
+function renderEstado(){
+  var e=$('estado');
+  if(!PC.configurado()){e.innerHTML='';return}
+  var down=(Date.now()-lastOk)>25000&&fails>=2;
+  e.innerHTML=down?'Sin conexión':'';
+  e.style.fontSize=Math.round(Math.min(L.W,L.H)*0.026)+'px';
+}
+function render(){renderFecha();renderAhora();renderMsgs();renderEstado()}
+
+/* ---- parpadeo ---- */
+function flashMsg(m){
+  var f=$('flash');
+  $('fd').innerHTML='Mensaje de '+esc(m.de);
+  $('ft').innerHTML=esc(m.texto);
+  var u=Math.min(L.W,L.H);
+  $('fd').style.fontSize=Math.round(u*0.07)+'px';
+  var s=u*0.10;$('ft').style.fontSize=Math.round(s)+'px';
+  f.style.display='block';f.className='a';
+  var guard=0;while($('ft').scrollHeight+$('fd').offsetHeight>L.H*0.78&&s>18&&guard++<60){s-=3;$('ft').style.fontSize=Math.round(s)+'px'}
+  flashEnd=Date.now()+45000;
+  if(flashTimer)clearInterval(flashTimer);
+  var t=0;
+  flashTimer=setInterval(function(){
+    t++;f.className=(t%2)?'b':'a';
+    if(Date.now()>flashEnd)stopFlash();
+  },700);
+}
+function stopFlash(){
+  if(flashTimer){clearInterval(flashTimer);flashTimer=null}
+  $('flash').style.display='none';
+}
+$('flash').onclick=stopFlash;
+
+/* ---- red ---- */
+function pollMsgs(){
+  if(!PC.configurado())return;
+  PC.xhr('GET',PC.url('mensajes'),null,function(ok,j){
+    if(!ok){fails++;renderEstado();return}
+    fails=0;lastOk=Date.now();
+    var list=[],k;
+    if(j&&typeof j==='object'){for(k in j)if(j.hasOwnProperty(k)&&j[k]&&j[k].texto)list.push({id:k,de:j[k].de||'',texto:j[k].texto,ts:j[k].ts||Date.now()})}
+    msgs=list;ls('pc_msgs',JSON.stringify(list));
+    /* ¿mensajes nuevos? */
+    var nuevos=list.filter(function(m){return seen.indexOf(m.id)<0&&(Date.now()-m.ts)<10*60*1000});
+    list.forEach(function(m){if(seen.indexOf(m.id)<0)seen.push(m.id)});
+    if(seen.length>200)seen=seen.slice(-200);
+    ls('pc_vistos',JSON.stringify(seen));
+    if(nuevos.length){nuevos.sort(function(a,b){return b.ts-a.ts});flashMsg(nuevos[0])}
+    renderMsgs();renderEstado();
+  });
+}
+function pollAgenda(){
+  if(!PC.configurado())return;
+  PC.xhr('GET',PC.url('agenda'),null,function(ok,j){
+    if(!ok||!j||!j.sem)return;
+    agenda={sem:j.sem,fest:j.fest||{}};ls('pc_agenda',JSON.stringify(agenda));renderAhora();
+  });
+}
+function heartbeat(){
+  if(!PC.configurado())return;
+  function send(bat,chg){
+    PC.xhr('PUT',PC.url('latido'),{ts:{'.sv':'timestamp'},bat:bat,cargando:chg,v:VERSION},function(){});
+  }
+  if(navigator.getBattery){
+    navigator.getBattery().then(function(b){send(Math.round(b.level*100),!!b.charging)},function(){send(null,null)});
+  }else send(null,null);
+}
+
+/* ---- reloj ---- */
+function tick(){
+  var d=new Date(),key=PC.iso(d)+' '+d.getHours()+':'+d.getMinutes();
+  if(key!==lastTick){
+    lastTick=key;renderFecha();renderAhora();renderMsgs();
+    /* recarga nocturna (coge versiones nuevas) */
+    if(d.getHours()===3&&d.getMinutes()===30&&ls('pc_reload')!==PC.iso(d)&&navigator.onLine!==false){
+      ls('pc_reload',PC.iso(d));location.reload();
+    }
+  }
+}
+
+window.addEventListener('resize',function(){setTimeout(layout,150)});
+window.addEventListener('orientationchange',function(){setTimeout(layout,300)});
+layout();
+setInterval(tick,1000);
+setInterval(renderEstado,5000);
+pollAgenda();pollMsgs();heartbeat();
+setInterval(pollMsgs,6000);
+setInterval(pollAgenda,60000);
+setInterval(heartbeat,60000);
+
+/* pantalla encendida (si el navegador lo permite) */
+function wake(){try{if(navigator.wakeLock&&navigator.wakeLock.request)navigator.wakeLock.request('screen').catch(function(){})}catch(e){}}
+wake();document.addEventListener('visibilitychange',function(){if(!document.hidden)wake()});
+
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
+  try{navigator.serviceWorker.register('sw.js')}catch(e){}
+}
+window.PCpanel={agenda:function(){return agenda},render:render};
+})();
+</script>
+</body>
+</html>

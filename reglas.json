@@ -1,0 +1,22 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "panel": {
+      ".read": true,
+      "mensajes": {
+        ".write": "auth != null && (auth.token.email === 'cop1310@hotmail.com' || auth.token.email === 'davidop374@hotmail.com' || auth.token.email === 'danielortizperez1982@gmail.com')",
+        "$id": {
+          ".validate": "newData.hasChildren(['de','texto','ts']) && newData.child('texto').isString() && newData.child('texto').val().length <= 300 && newData.child('de').isString() && newData.child('de').val().length <= 20"
+        }
+      },
+      "agenda": {
+        ".write": "auth != null && (auth.token.email === 'cop1310@hotmail.com' || auth.token.email === 'davidop374@hotmail.com' || auth.token.email === 'danielortizperez1982@gmail.com')"
+      },
+      "latido": {
+        ".write": true,
+        ".validate": "newData.hasChildren(['ts'])"
+      }
+    }
+  }
+}
