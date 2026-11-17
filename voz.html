@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prueba de voz</title>
+<style>
+body{font-family:Roboto,Arial,sans-serif;margin:0;padding:16px;background:#F4F6FA;color:#14213D;font-size:20px}
+h1{font-size:24px;margin:0 0 8px}
+.c{background:#fff;border:1px solid #cfd8e6;border-radius:12px;padding:14px;margin:12px 0}
+button{display:block;width:100%;font-size:22px;padding:18px;border:0;border-radius:12px;background:#1F4E79;color:#fff;font-weight:700;margin:10px 0}
+button.s{background:#fff;color:#1F4E79;border:2px solid #1F4E79}
+button.n{background:#78909C}
+select,textarea,input[type=range]{width:100%;font-size:20px;padding:10px;margin:6px 0;box-sizing:border-box}
+#log{font-size:16px;white-space:pre-wrap;color:#33415c}
+small{color:#5B6B8C}
+</style></head><body>
+<h1>Prueba de voz</h1>
+<small>Sube el volumen de la tablet (multimedia) antes de empezar.</small>
+
+<div class="c"><b>1. Frase de prueba</b>
+<textarea id="t" rows="3">Mensaje de David: hoy viene Emma a comer a las dos. Un beso, mamá.</textarea>
+<button id="b1">▶ Leer ahora</button>
+<button class="s" id="b2">▶ Leer dentro de 10 segundos (tras tocar aquí)</button>
+</div>
+
+<div class="c"><b>2. Ajustes</b>
+<small>Voz</small><select id="v"></select>
+<small>Velocidad: <span id="rv">0.85</span></small><input type="range" id="r" min="0.5" max="1.3" step="0.05" value="0.85">
+<small>Volumen de la voz: <span id="vv">1</span></small><input type="range" id="vo" min="0.2" max="1" step="0.1" value="1">
+<small>Veces que se lee</small><select id="n"><option>1</option><option selected>2</option><option>3</option></select>
+</div>
+
+<div class="c"><b>3. ¿Funciona sin tocar nada tras recargar?</b>
+<small>Pulsa el botón: la página se recarga y intenta hablar sola. Si no se oye nada, Chrome la bloquea y habrá que tenerlo en cuenta.</small>
+<button class="n" id="b3">⟳ Recargar y probar sin tocar</button></div>
+
+<div class="c"><b>Información</b><div id="log"></div></div>
+<script>
+function $(i){return document.getElementById(i)}
+var log=[];function L(s){log.push(s);$('log').textContent=log.join('\n')}
+var ss=window.speechSynthesis,voces=[];
+if(!ss){L('Este navegador NO tiene voz (speechSynthesis).')}
+function cargaVoces(){
+  if(!ss)return;
+  voces=ss.getVoices();var es=[],i,h='';
+  for(i=0;i<voces.length;i++)if(/^es/i.test(voces[i].lang))es.push(i);
+  var uso=es.length?es:voces.map(function(_,k){return k});
+  for(i=0;i<uso.length;i++){var v=voces[uso[i]];h+='<option value="'+uso[i]+'">'+v.name+' ('+v.lang+(v.localService?', sin internet':', con internet')+')</option>'}
+  var prev=$('v').value;$('v').innerHTML=h||'<option value="">Voz por defecto</option>';if(prev)$('v').value=prev;
+  L('Voces totales: '+voces.length+' · en español: '+es.length);
+}
+if(ss){cargaVoces();ss.onvoiceschanged=cargaVoces}
+function dice(txt,veces,quiet){
+  if(!ss){L('No hay voz.');return}
+  ss.cancel();
+  var k;for(k=0;k<veces;k++){
+    var u=new SpeechSynthesisUtterance(txt);u.lang='es-ES';u.rate=parseFloat($('r').value);u.volume=parseFloat($('vo').value);
+    var vi=$('v').value;if(vi!==''&&voces[vi])u.voice=voces[vi];
+    if(k===0){u.onstart=function(){L('✔ Empieza a hablar ('+new Date().toLocaleTimeString()+')')};}
+    u.onerror=function(e){L('✖ Error de voz: '+(e.error||'?'))};
+    ss.speak(u);
+  }
+  if(!quiet)L('Pedida la lectura ('+veces+' vez/veces).');
+}
+$('r').oninput=function(){$('rv').textContent=this.value};$('vo').oninput=function(){$('vv').textContent=this.value};
+$('b1').onclick=function(){dice($('t').value,parseInt($('n').value,10))};
+$('b2').onclick=function(){
+  var t=$('t').value,n=parseInt($('n').value,10);L('Esperando 10 s… no toques nada.');
+  setTimeout(function(){dice(t,n)},10000);
+};
+$('b3').onclick=function(){location.href=location.pathname+'?auto=1'};
+if(/auto=1/.test(location.search)){
+  L('Cargada con ?auto=1: intento hablar SIN haber tocado nada.');
+  var ok=false,tm=setTimeout(function(){if(!ok)L('✖ No ha empezado a hablar en 6 s: Chrome lo bloquea sin tocar la pantalla.')},6000);
+  var orig=L;L=function(s){if(/Empieza/.test(s)){ok=true}orig(s)};
+  setTimeout(function(){dice($('t').value,1,true)},800);
+}
+</script></body></html>
