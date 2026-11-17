@@ -96,6 +96,11 @@ textarea{min-height:92px;resize:vertical;font-size:18px}
         <div class="hint">Para llamar su atención. Sigue parpadeando hasta que pulses Parar (o 10 min como máximo).</div>
         <div class="row" style="margin-top:8px"><button class="btn warn" id="bfl">⚡ Parpadear</button><button class="btn sec" id="bfl0">Parar</button></div>
         <div class="st" id="flst"></div>
+        <div style="height:10px"></div>
+        <b>Sonido</b>
+        <div class="hint">Suena una alarma de 5 segundos y se apaga sola. Puedes pulsarlo las veces que quieras.</div>
+        <div class="row" style="margin-top:8px"><button class="btn" id="bso">🔔 Sonar</button></div>
+        <div class="st" id="sost"></div>
       </div>
       <div class="card">
         <b>Aviso en lugar de la rutina</b>
@@ -316,6 +321,10 @@ function pintaExtra(){
 function pollExtra(){
   PC.xhr('GET',PC.url('aviso'),null,function(ok,j){if(!ok)return;aviso=(j&&typeof j==='object'&&j.texto)?j:null;pintaExtra()});
   PC.xhr('GET',PC.url('alerta'),null,function(ok,j){if(!ok)return;alerta=(j&&typeof j==='object')?j:null;pintaExtra()});
+  PC.xhr('GET',PC.url('sonido'),null,function(ok,j){
+    if(!ok)return;
+    $('sost').innerHTML=(j&&typeof j==='object'&&j.ts)?'⚪ Última vez: '+esc(j.de||'?')+', '+hhmm(j.ts):'⚪ Aún no se ha usado.';
+  });
   PC.xhr('GET',PC.url('recordatorio'),null,function(ok,j){
     if(!ok)return;
     var t=(j&&typeof j==='object'&&j.texto)?j.texto:'';
@@ -336,6 +345,13 @@ function pon(path,val,msg){
 }
 $('bfl').onclick=function(){pon('alerta',{on:true,de:sess.who,ts:{'.sv':'timestamp'}},'Parpadeando ✓ (en unos segundos)')};
 $('bfl0').onclick=function(){pon('alerta',{on:false,de:sess.who,ts:{'.sv':'timestamp'}},'Parado ✓')};
+$('bso').onclick=function(){
+  var b=$('bso');b.disabled=true;setTimeout(function(){b.disabled=false},6000);
+  escribe('PUT','sonido',{de:sess.who,ts:{'.sv':'timestamp'}},function(ok,err){
+    if(!ok){toast(err);b.disabled=false;return}
+    toast('Sonando en unos segundos 🔔');pollExtra();
+  });
+};
 $('bav').onclick=function(){
   var t=$('avtxt').value.replace(/^\s+|\s+$/g,'');
   if(!t){$('averr').textContent='Escribe el aviso.';return}
