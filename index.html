@@ -15,6 +15,17 @@
 html,body{margin:0;height:100%;overflow:hidden;font-family:"Segoe UI",Roboto,Arial,sans-serif;-webkit-user-select:none;user-select:none}
 body{background:#D8EDD5;color:#1B2A4A;-webkit-transition:background .6s;transition:background .6s}
 body.noche{background:#3A0D0D;color:#FFE9D6}
+body.tarde{background:#FFF0A6;color:#3A2E00}
+body.tarde #fl,body.tarde #hm,body.tarde #per{color:#4E3B00}
+body.tarde #rec{color:#8A3B00}
+body.tarde #ahora{background:#FFFBE0;border-color:#B8860B}
+body.tarde #ahora.av{background:#FFF3E0;border-color:#C62828}
+body.tarde #cuenta{color:#5D4300}
+body.tarde #barra{background:#F2E0A0}
+body.tarde #barraI{background:#B8860B}
+body.tarde #chat{background:#FFFDF0;border-color:#D9C46A}
+body.tarde .m{background:#FFF8D6;border-left-color:#B8860B}
+body.tarde .m.nuevo{background:#FFE082;border-left-color:#E65100}
 #app{position:absolute;left:0;top:0;right:0;bottom:0}
 .blk{position:absolute;overflow:hidden}
 #dia{font-weight:800;text-align:center;line-height:1.05;white-space:nowrap}
@@ -98,7 +109,7 @@ window.FESTIVOS_DEF=['2026-12-07','2026-12-08','2026-12-25',
 </script>
 <script>
 (function(){
-var VERSION='1.5';
+var VERSION='1.6';
 /* ---- ajustes fáciles de cambiar ---- */
 var NOCHE_INI=22*60;          /* 22:00 empieza la noche */
 var NOCHE_FIN=7*60+30;        /* 7:30 acaba la noche */
@@ -145,6 +156,8 @@ function layout(){
   setFs('hm',Math.min(hh*0.70,hw*0.34));setFs('per',Math.min(hh*0.22,hw*0.07));
   render();
 }
+/* color del fondo: verde 7:30-9:00 · amarillo 9:00-21:00 · rojo 21:00-7:30 */
+function tema(d){var mm=d.getHours()*60+d.getMinutes();if(mm>=21*60||mm<7*60+30)return 'noche';if(mm<9*60)return 'dia';return 'tarde'}
 function esNoche(d){var mm=d.getHours()*60+d.getMinutes();return mm>=NOCHE_INI||mm<NOCHE_FIN}
 function minOf(s){var p=String(s).split(':'),h=parseInt(p[0],10),mi=parseInt(p[1]||'0',10);if(isNaN(h)||isNaN(mi))return null;return h*60+mi}
 function fmtDur(min){
@@ -192,7 +205,7 @@ function renderAhora(){
   var d=new Date(),S=situacion(d),cur=S.cur,nx=S.next,av=(aviso&&aviso.texto)?aviso:null;
   var centro=!!(cur&&cur.b.c)&&!av;
   var sinAct=!cur&&!av;
-  document.body.className=esNoche(d)?'noche':'dia';
+  document.body.className=tema(d);
   var box=$('ahora'),ah=box.clientHeight,aw=box.clientWidth,land=L.land;
   $('ahora').className=av?'blk av':'blk';
   /* texto principal */
