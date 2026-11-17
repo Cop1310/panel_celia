@@ -57,7 +57,7 @@ textarea{min-height:92px;resize:vertical;font-size:18px}
 <body>
 <div class="wrap">
   <h1>Panel de Celia · Familia</h1>
-  <div class="sub">Mensajes para la tablet de mamá y horario del día.</div>
+  <div class="sub">Mensajes para la tablet de mamá, notas y horario del día.</div>
 
   <div id="sinconf" class="card hidden"><b>Falta configurar Firebase.</b><br>Rellena <code>firebase-config.js</code> (mira el LEEME) y vuelve a abrir esta página.</div>
 
@@ -84,6 +84,14 @@ textarea{min-height:92px;resize:vertical;font-size:18px}
         <button class="btn" id="bsend">Enviar a la tablet</button>
       </div>
       <div class="card">
+        <b>Nota bajo la fecha</b>
+        <div class="hint">Ej.: “Hoy es el cumpleaños de Emma”. Sale bajo la fecha grande hasta que la quites.</div>
+        <input id="rectxt" type="text" maxlength="60" placeholder="Hoy es el cumpleaños de…">
+        <div class="err" id="recerr"></div>
+        <div class="row"><button class="btn" id="brec">Poner nota</button><button class="btn sec" id="brec0">Quitar nota</button></div>
+        <div class="st" id="recst"></div>
+      </div>
+      <div class="card">
         <b>Parpadeo de la pantalla</b>
         <div class="hint">Para llamar su atención. Sigue parpadeando hasta que pulses Parar (o 10 min como máximo).</div>
         <div class="row" style="margin-top:8px"><button class="btn warn" id="bfl">⚡ Parpadear</button><button class="btn sec" id="bfl0">Parar</button></div>
@@ -106,24 +114,20 @@ textarea{min-height:92px;resize:vertical;font-size:18px}
     </div>
 
     <div id="p2" class="hidden">
-      <div class="hint">Elige un día, cambia las franjas y pulsa Guardar. La tablet usa la franja de la hora más reciente. La franja “noche” pone la pantalla oscura.</div>
-      <div class="chips" id="chips"></div>
+      <div class="hint">Cambia las franjas y pulsa Guardar. Los festivos entre semana se tratan como sábado. “Centro de día” hace que la tablet ponga “Hoy hay centro de día”. Días: L M X J V S D.</div>
       <div id="bloques"></div>
       <button class="btn sec" id="badd">+ Añadir franja</button>
       <div style="height:8px"></div>
-      <button class="btn" id="bsave">Guardar este día</button>
-      <div style="height:8px"></div>
-      <button class="btn sec" id="bcopy">Copiar este día a lunes–viernes</button>
+      <button class="btn" id="bsave">Guardar horario</button>
 
       <div class="card">
-        <b>Festivos y días especiales</b>
-        <div class="hint">Un día festivo entre semana se trata como sábado o domingo.</div>
+        <b>Festivos extra</b>
+        <div class="hint">Ya están los nacionales, de la Comunidad y de Madrid capital hasta 2027 (revísalos cada año). Aquí añades más días.</div>
         <input id="fdate" type="date">
-        <select id="fcomo"><option value="sab">Como un sábado (sin centro de día)</option><option value="dom">Como un domingo (misa)</option></select>
         <button class="btn" id="bfest">Añadir ese día</button>
         <div id="flist"></div>
       </div>
-      <button class="btn sec" id="bdef">Restaurar horario por defecto</button>
+      <button class="btn sec" id="bdef">Restaurar horario original</button>
     </div>
   </div>
 </div>
@@ -139,6 +143,67 @@ function toast(t){var e=$('toast');e.textContent=t;e.style.display='block';clear
 function show(id,on){$(id).className=$(id).className.replace(/\bhidden\b/g,'').replace(/\s+$/,'')+(on?'':' hidden')}
 
 var sess=null,agenda=null,diaSel=null,msgs=[],bloques=[];
+/* Rutina por defecto de Celia (del Excel semanal) y festivos. Editable desde ajustes.html (se guarda en Firebase). */
+(function(){
+var T=[0,1,2,3,4,5,6],LV=[1,2,3,4,5],FS=[0,6];
+/* d=días (0=dom..6=sáb) · i=inicio · f=fin · t=texto · s=subtexto · ic=icono · c=1 → centro de día (panel en blanco) */
+window.RUTINA_DEF=[
+ {d:T, i:'22:00',f:'07:30',t:'A DORMIR',s:'Hasta las 7:30 no te levantes',ic:'😴'},
+ {d:T, i:'07:30',f:'08:30',t:'DESAYUNO',s:'Media pastilla de la tensión y la pastilla del ánimo',ic:'☕'},
+ {d:LV,i:'08:30',f:'17:00',t:'CENTRO DE DÍA',s:'',ic:'🏫',c:1},
+ {d:[0],i:'08:30',f:'10:00',t:'IR A MISA',s:'',ic:'⛪'},
+ {d:FS,i:'13:00',f:'14:00',t:'COMER',s:'',ic:'🍽️'},
+ {d:T, i:'20:00',f:'21:00',t:'CENAR',s:'',ic:'🍽️'},
+ {d:T, i:'21:00',f:'22:00',t:'PASTILLAS Y A DORMIR',s:'Media pastilla de la tensión y la pastilla de la memoria',ic:'💊'}
+];
+/* Festivos (nacionales + Comunidad de Madrid + Madrid capital). Revisar cada año en ajustes.html. */
+window.FESTIVOS_DEF=['2026-12-07','2026-12-08','2026-12-25',
+ '2027-01-01','2027-01-06','2027-03-19','2027-03-25','2027-03-26','2027-05-01','2027-05-15','2027-08-16','2027-10-12','2027-11-01','2027-11-09','2027-12-06','2027-12-08','2027-12-25'];
+})();
+
+function minOf(s){var p=String(s).split(':'),h=parseInt(p[0],10),mi=parseInt(p[1]||'0',10);if(isNaN(h)||isNaN(mi))return null;return h*60+mi}
+function fmtDur(min){
+  min=Math.ceil(min);
+  if(min<1)return 'menos de 1 min';
+  var h=Math.floor(min/60),mi=min%60;
+  if(h===0)return mi+' min';
+  if(mi===0)return h+' h';
+  return h+' h '+mi+' min';
+}
+/* ---- rutina (por defecto rutina.js; la familia la puede cambiar en ajustes.html → Firebase 'rutina' y 'festivos') ---- */
+var rutina=null,festivos=null;
+try{rutina=JSON.parse(ls('pc_rutina')||'null')}catch(e){}
+try{festivos=JSON.parse(ls('pc_festivos')||'null')}catch(e){}
+function arr(x){if(!x)return [];if(x.length!==undefined&&typeof x!=='string')return Array.prototype.slice.call(x);var r=[];for(var k in x)if(x.hasOwnProperty(k))r.push(x[k]);return r}
+function rutBloques(){var r=arr(rutina);return r.length?r:window.RUTINA_DEF}
+function esFestivo(d){var k=PC.iso(d),l=window.FESTIVOS_DEF.concat(arr(festivos));for(var i=0;i<l.length;i++)if(l[i]===k)return true;return false}
+function diaEf(d){var w=d.getDay();return esFestivo(d)?(w===0?0:6):w}
+/* segmentos en minutos desde las 0:00 de hoy (ayer, hoy, mañana y pasado) */
+function segmentos(now){
+  var out=[],bl=rutBloques();
+  for(var k=-1;k<=2;k++){
+    var dd=new Date(now.getFullYear(),now.getMonth(),now.getDate()+k,12,0,0),ef=diaEf(dd);
+    for(var j=0;j<bl.length;j++){
+      var b=bl[j],ds=arr(b.d),ok=false;
+      for(var q=0;q<ds.length;q++)if(Number(ds[q])===ef)ok=true;
+      if(!ok)continue;
+      var i=minOf(b.i),f=minOf(b.f);if(i===null||f===null)continue;
+      var len=f-i;if(len<=0)len+=1440;
+      out.push({a:k*1440+i,z:k*1440+i+len,b:b});
+    }
+  }
+  return out;
+}
+function situacion(now){
+  var m=now.getHours()*60+now.getMinutes()+now.getSeconds()/60,sg=segmentos(now),cur=null,nx=null,i;
+  for(i=0;i<sg.length;i++)if(sg[i].a<=m&&m<sg[i].z&&(!cur||sg[i].a>cur.a))cur=sg[i];
+  for(i=0;i<sg.length;i++){
+    var x=sg[i];
+    if(x.a>m&&(!cur||x.a>=cur.z)&&(!nx||x.a<nx.a))nx=x;
+  }
+  return {m:m,cur:cur,next:nx};
+}
+
 try{sess=JSON.parse(ls('pcf_sess')||'null')}catch(e){}
 var aviso=null,alerta=null;
 
@@ -243,15 +308,29 @@ function pintaExtra(){
   var a='';
   if(aviso&&aviso.texto)a='🟠 <b>Aviso activo</b> ('+esc(aviso.de||'?')+', '+hhmm(aviso.ts||0)+'):<br>“'+esc(aviso.texto)+'”';
   else{
-    var cur=null;try{cur=agenda?PC.ahora(agenda,new Date()).cur:null}catch(e){}
-    a='⚪ La tablet muestra el aviso automático del horario'+(cur?': “'+cur.t+'”':'.');
+    var cur=null;try{var SS=situacion(new Date());cur=SS.cur?{t:(SS.cur.b.c?'Hoy hay centro de día':SS.cur.b.t)}:null}catch(e){}
+    a='⚪ La tablet muestra el aviso automático del horario'+(cur?': “'+esc(cur.t)+'”':'.');
   }
   $('avst').innerHTML=a;
 }
 function pollExtra(){
   PC.xhr('GET',PC.url('aviso'),null,function(ok,j){if(!ok)return;aviso=(j&&typeof j==='object'&&j.texto)?j:null;pintaExtra()});
   PC.xhr('GET',PC.url('alerta'),null,function(ok,j){if(!ok)return;alerta=(j&&typeof j==='object')?j:null;pintaExtra()});
+  PC.xhr('GET',PC.url('recordatorio'),null,function(ok,j){
+    if(!ok)return;
+    var t=(j&&typeof j==='object'&&j.texto)?j.texto:'';
+    $('recst').innerHTML=t?'🟠 Nota puesta: “'+esc(t)+'”':'⚪ Sin nota.';
+  });
 }
+$('brec').onclick=function(){
+  var t=$('rectxt').value.replace(/^\s+|\s+$/g,'');
+  if(!t){$('recerr').textContent='Escribe la nota.';return}
+  $('recerr').textContent='';
+  escribe('PUT','recordatorio',{de:sess.who,texto:t,ts:{'.sv':'timestamp'}},function(ok,err){if(!ok){toast(err);return}$('rectxt').value='';toast('Nota puesta ✓ (en unos segundos)');pollExtra()});
+};
+$('brec0').onclick=function(){
+  escribe('DELETE','recordatorio',undefined,function(ok,err){if(!ok){toast(err);return}toast('Nota quitada ✓');pollExtra()});
+};
 function pon(path,val,msg){
   escribe('PUT',path,val,function(ok,err){if(!ok){toast(err);return}toast(msg);pollExtra()});
 }
@@ -308,97 +387,91 @@ $('bdelall').onclick=function(){
   escribe('DELETE','mensajes',undefined,function(ok,err){if(!ok)toast(err);else{pollMsgs();toast('Borrados')}});
 };
 
-/* ---------- horario ---------- */
-var ICONOS=['☀','🍳','🏫','⛪','🍽','🏠','🌙','💊','🚶','📞','🛁','🛏'];
+/* ---------- horario (rutina) ---------- */
+var ICONOS=['😴','☕','🏫','⛪','🍽️','💊','🏠','🚶','📞','🛁','☀','🌙'],ed=[];
+var DN=[['L',1],['M',2],['X',3],['J',4],['V',5],['S',6],['D',0]];
 function cargaAgenda(){
-  PC.xhr('GET',PC.url('agenda'),null,function(ok,j){
-    agenda=(ok&&j&&j.sem)?{sem:j.sem,fest:j.fest||{}}:PC.DEF();
-    if(!diaSel){var k=PC.KEYS[new Date().getDay()];diaSel=k}
-    pintaChips();pintaDia();pintaFest();pintaExtra();
+  PC.xhr('GET',PC.url('rutina'),null,function(ok,j){
+    if(ok){var r=arr(j);rutina=r.length?r:null;ls('pc_rutina',JSON.stringify(rutina))}
+    PC.xhr('GET',PC.url('festivos'),null,function(ok2,f){
+      if(ok2){festivos=(f&&typeof f==='object')?f:null;ls('pc_festivos',JSON.stringify(festivos))}
+      ed=JSON.parse(JSON.stringify(rutBloques())).map(function(b){b.d=arr(b.d).map(Number);return b}).sort(function(a,b){return (minOf(a.i)||0)-(minOf(b.i)||0)});
+      pintaBloques();pintaFest();pintaExtra();
+    });
   });
-}
-function pintaChips(){
-  var ord=['lun','mar','mie','jue','vie','sab','dom'],let_={lun:'L',mar:'M',mie:'X',jue:'J',vie:'V',sab:'S',dom:'D'},h='',i;
-  for(i=0;i<ord.length;i++)h+='<div class="chip'+(ord[i]===diaSel?' on':'')+'" data-k="'+ord[i]+'">'+let_[ord[i]]+'</div>';
-  $('chips').innerHTML=h;
-  var cs=$('chips').getElementsByTagName('div');
-  for(i=0;i<cs.length;i++)cs[i].onclick=function(){leeBloques();diaSel=this.getAttribute('data-k');pintaChips();pintaDia()};
-}
-function pintaDia(){
-  bloques=PC.sortBlocks(PC.arr(agenda.sem[diaSel])).map(function(b){return {h:b.h,t:b.t,i:b.i||'',n:b.n?1:0}});
-  pintaBloques();
 }
 function pintaBloques(){
-  var h='',i,j,o;
-  for(i=0;i<bloques.length;i++){
-    var b=bloques[i];o='';
-    for(j=0;j<ICONOS.length;j++)o+='<option'+(ICONOS[j]===b.i?' selected':'')+'>'+ICONOS[j]+'</option>';
-    if(b.i&&ICONOS.indexOf(b.i)<0)o+='<option selected>'+esc(b.i)+'</option>';
-    h+='<div class="blk" data-i="'+i+'"><div class="r1"><input type="time" class="fh" value="'+esc(b.h)+'"><select class="fi">'+o+'</select></div>'+
-       '<input type="text" class="ft" maxlength="80" value="'+esc(b.t)+'">'+
-       '<div class="r1" style="justify-content:space-between;align-items:center"><label class="nl"><input type="checkbox" class="fn"'+(b.n?' checked':'')+'> Noche (pantalla oscura, a dormir)</label><button class="del" data-del="'+i+'">Quitar</button></div></div>';
+  var h='',i,j,o,b,dh;
+  for(i=0;i<ed.length;i++){
+    b=ed[i];o='';
+    for(j=0;j<ICONOS.length;j++)o+='<option'+(ICONOS[j]===b.ic?' selected':'')+'>'+ICONOS[j]+'</option>';
+    if(b.ic&&ICONOS.indexOf(b.ic)<0)o+='<option selected>'+esc(b.ic)+'</option>';
+    dh='';
+    for(j=0;j<DN.length;j++)dh+='<label class="nl" style="display:inline-flex;margin-right:10px"><input type="checkbox" class="fd" data-d="'+DN[j][1]+'"'+(b.d.indexOf(DN[j][1])>=0?' checked':'')+'> '+DN[j][0]+'</label>';
+    h+='<div class="blk"><div class="hint">Desde / hasta</div><div class="r1"><input type="time" class="fi" value="'+esc(b.i)+'"><input type="time" class="ff" value="'+esc(b.f)+'"><select class="fic">'+o+'</select></div>'+
+       '<input type="text" class="ft" maxlength="40" placeholder="Texto grande (ej. DESAYUNO)" value="'+esc(b.t)+'">'+
+       '<input type="text" class="fs" maxlength="80" placeholder="Texto pequeño (ej. pastillas)" value="'+esc(b.s||'')+'">'+
+       '<div style="margin-bottom:8px">'+dh+'</div>'+
+       '<div class="r1" style="justify-content:space-between;align-items:center"><label class="nl"><input type="checkbox" class="fc"'+(b.c?' checked':'')+'> Centro de día (“Hoy hay centro de día”)</label><button class="del" data-del="'+i+'">Quitar</button></div></div>';
   }
-  if(!bloques.length)h='<div class="hint">Este día no tiene franjas.</div>';
+  if(!ed.length)h='<div class="hint">No hay franjas.</div>';
   $('bloques').innerHTML=h;
   var ds=$('bloques').getElementsByTagName('button');
-  for(i=0;i<ds.length;i++)ds[i].onclick=function(){leeBloques();bloques.splice(parseInt(this.getAttribute('data-del'),10),1);pintaBloques()};
+  for(i=0;i<ds.length;i++)ds[i].onclick=function(){leeBloques();ed.splice(parseInt(this.getAttribute('data-del'),10),1);pintaBloques()};
 }
 function leeBloques(){
-  var els=$('bloques').getElementsByClassName('blk'),out=[],i,e,h,t;
+  var els=$('bloques').getElementsByClassName('blk'),out=[],i,e,ds,k,q;
   for(i=0;i<els.length;i++){
-    e=els[i];h=e.getElementsByClassName('fh')[0].value;t=e.getElementsByClassName('ft')[0].value.replace(/^\s+|\s+$/g,'');
-    out.push({h:h,t:t,i:e.getElementsByClassName('fi')[0].value,n:e.getElementsByClassName('fn')[0].checked?1:0});
+    e=els[i];ds=[];q=e.getElementsByClassName('fd');
+    for(k=0;k<q.length;k++)if(q[k].checked)ds.push(parseInt(q[k].getAttribute('data-d'),10));
+    var o={d:ds,i:e.getElementsByClassName('fi')[0].value,f:e.getElementsByClassName('ff')[0].value,t:e.getElementsByClassName('ft')[0].value.replace(/^\s+|\s+$/g,''),s:e.getElementsByClassName('fs')[0].value.replace(/^\s+|\s+$/g,''),ic:e.getElementsByClassName('fic')[0].value};
+    if(e.getElementsByClassName('fc')[0].checked)o.c=1;
+    out.push(o);
   }
-  if(els.length||!bloques.length)bloques=out;
-  return bloques;
+  if(els.length||!ed.length)ed=out;
+  return ed;
 }
-function limpia(L){
-  return PC.sortBlocks(L.filter(function(b){return b.h&&b.t})).map(function(b){var o={h:b.h,t:b.t};if(b.i)o.i=b.i;if(b.n)o.n=1;return o});
-}
-$('badd').onclick=function(){leeBloques();bloques.push({h:'12:00',t:'',i:'☀',n:0});pintaBloques()};
+$('badd').onclick=function(){leeBloques();ed.push({d:[1,2,3,4,5],i:'12:00',f:'13:00',t:'',s:'',ic:'☀'});pintaBloques()};
 $('bsave').onclick=function(){
-  var L=limpia(leeBloques());
-  if(!L.length){toast('Pon al menos una franja con hora y texto.');return}
-  escribe('PUT','agenda/sem/'+diaSel,L,function(ok,err){
+  var L=leeBloques(),i;
+  for(i=0;i<L.length;i++)if(!L[i].t||!L[i].i||!L[i].f||!L[i].d.length){toast('Falta texto, horas o días en la franja '+(i+1)+'.');return}
+  if(!L.length){toast('Pon al menos una franja.');return}
+  escribe('PUT','rutina',L,function(ok,err){
     if(!ok){toast(err);return}
-    agenda.sem[diaSel]=L;pintaDia();toast('Guardado ✓ (la tablet lo recoge en 1 minuto)');
+    rutina=L;ls('pc_rutina',JSON.stringify(rutina));toast('Guardado ✓ (la tablet lo recoge en 1 minuto)');pintaExtra();
   });
 };
-$('bcopy').onclick=function(){
-  var L=limpia(leeBloques());
-  if(!L.length){toast('Pon al menos una franja con hora y texto.');return}
-  if(!confirm('¿Copiar este horario a lunes, martes, miércoles, jueves y viernes?'))return;
-  var ks=['lun','mar','mie','jue','vie'],n=0;
-  ks.forEach(function(k){escribe('PUT','agenda/sem/'+k,L,function(ok,err){n++;if(ok)agenda.sem[k]=L;if(n===ks.length){toast('Copiado ✓');pintaDia()}})});
-};
 $('bdef').onclick=function(){
-  if(!confirm('¿Restaurar TODO el horario por defecto? Se pierden tus cambios.'))return;
-  var d=PC.DEF();
-  escribe('PUT','agenda',{sem:d.sem,fest:agenda.fest||{}},function(ok,err){if(!ok){toast(err);return}agenda.sem=d.sem;pintaDia();toast('Horario restaurado')});
+  if(!confirm('¿Restaurar el horario original? Se pierden tus cambios.'))return;
+  escribe('DELETE','rutina',undefined,function(ok,err){
+    if(!ok){toast(err);return}
+    rutina=null;ls('pc_rutina',null);ed=JSON.parse(JSON.stringify(window.RUTINA_DEF));pintaBloques();pintaExtra();toast('Horario restaurado');
+  });
 };
 function pintaFest(){
-  var f=agenda.fest||{},ks=[],k,h='';
-  for(k in f)if(f.hasOwnProperty(k))ks.push(k);
-  ks.sort();
-  for(var i=0;i<ks.length;i++){
-    var p=ks[i].split('-');
-    h+='<div class="msg"><div class="m2" style="font-size:15px">'+p[2]+'/'+p[1]+'/'+p[0]+' · como '+PC.NOMBRE_KEY[f[ks[i]]]+'</div><button class="del" data-f="'+ks[i]+'">Quitar</button></div>';
+  var ks=arr(festivos).slice().sort(),h='',i,p;
+  for(i=0;i<ks.length;i++){
+    p=ks[i].split('-');
+    h+='<div class="msg"><div class="m2" style="font-size:15px">'+p[2]+'/'+p[1]+'/'+p[0]+'</div><button class="del" data-f="'+ks[i]+'">Quitar</button></div>';
   }
-  $('flist').innerHTML=h||'<div class="hint" style="margin-top:8px">No hay días especiales.</div>';
+  $('flist').innerHTML=h||'<div class="hint" style="margin-top:8px">No hay festivos extra.</div>';
   var bs=$('flist').getElementsByTagName('button');
   for(var j=0;j<bs.length;j++)bs[j].onclick=function(){
-    var key=this.getAttribute('data-f');
-    escribe('DELETE','agenda/fest/'+key,undefined,function(ok,err){if(!ok){toast(err);return}delete agenda.fest[key];pintaFest();toast('Quitado')});
+    var key=this.getAttribute('data-f'),nl=arr(festivos).filter(function(x){return x!==key});
+    guardaFest(nl,'Quitado');
   };
+}
+function guardaFest(nl,msg){
+  escribe(nl.length?'PUT':'DELETE','festivos',nl.length?nl:undefined,function(ok,err){
+    if(!ok){toast(err);return}
+    festivos=nl.length?nl:null;ls('pc_festivos',JSON.stringify(festivos));pintaFest();toast(msg);
+  });
 }
 $('bfest').onclick=function(){
   var d=$('fdate').value;
   if(!d){toast('Elige una fecha.');return}
-  var como=$('fcomo').value;
-  escribe('PUT','agenda/fest/'+d,como,function(ok,err){
-    if(!ok){toast(err);return}
-    if(!agenda.fest)agenda.fest={};agenda.fest[d]=como;pintaFest();toast('Añadido ✓');
-  });
+  var l=arr(festivos);if(l.indexOf(d)>=0){toast('Ya estaba.');return}
+  l.push(d);guardaFest(l,'Añadido ✓');
 };
 (function(){var n=new Date();$('fdate').value=PC.iso(n)})();
 

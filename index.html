@@ -71,7 +71,7 @@ body.noche .m.nuevo .de{color:#5D2A10}
   <div class="blk" id="bdia"><div id="dia"></div><div id="fl"></div><div id="rec"></div></div>
   <div class="blk" id="bhora"><div id="hm"></div><div id="per"></div></div>
   <div class="blk" id="ahora"><div class="t0" id="t0">AHORA</div><div id="aico"></div><div id="atxt"></div><div id="desp"></div><div id="cuenta"></div><div id="barra"><div id="barraI"></div></div></div>
-  <div class="blk" id="chat"><div class="ct" id="ct">Mensajes de tu familia</div><div id="msgs"></div><div id="estado"></div></div>
+  <div class="blk" id="chat"><div class="ct" id="ct" style="display:none"></div><div id="msgs"></div><div id="estado"></div></div>
   <div id="mask"></div>
   <div id="flash"><div class="fd" id="fd"></div><div class="ft" id="ft"></div><div class="fs">Toca la pantalla para continuar</div></div>
 </div>
@@ -195,25 +195,23 @@ function renderAhora(){
   document.body.className=esNoche(d)?'noche':'dia';
   var box=$('ahora'),ah=box.clientHeight,aw=box.clientWidth,land=L.land;
   $('ahora').className=av?'blk av':'blk';
-  box.style.visibility=centro?'hidden':'visible';
-  if(centro){applyMask();return}
   /* texto principal */
   var t0=$('t0'),ico=$('aico'),tx=$('atxt'),c=$('cuenta'),b=$('barra'),bi=$('barraI'),sub=$('desp');
-  var cuentaTxt='',prog=null,mostrarCuenta=!av&&!!nx;
+  var cuentaTxt='',prog=null,mostrarCuenta=!av&&!!nx&&!centro;
   if(mostrarCuenta){
     var rest=nx.a-S.m;
     cuentaTxt=(rest<=1?'Falta ':'Faltan ')+fmtDur(rest)+' para '+esc(nx.b.t);
     if(cur){var tot=nx.a-cur.a;if(tot>0){prog=(S.m-cur.a)/tot;prog=Math.max(0,Math.min(1,prog))}}
   }
   t0.innerHTML=av?'AVISO':(sinAct?'':'AHORA');
-  t0.style.display=sinAct?'none':'block';
+  t0.style.display=(sinAct||centro)?'none':'block';
   t0.style.fontSize=Math.round(Math.min(ah*0.08,aw*0.04))+'px';
   var icoTxt=av?esc(av.icono||''):(cur?cur.b.ic||'':(nx?nx.b.ic||'':''));
   ico.innerHTML=icoTxt;
-  ico.style.fontSize=Math.round(Math.min(ah*(land?0.17:0.14),aw*0.10))+'px';
-  tx.innerHTML=av?esc(av.texto):(cur?esc(cur.b.t):'');
+  ico.style.fontSize=Math.round(Math.min(ah*(centro?0.30:(land?0.17:0.14)),aw*0.16))+'px';
+  tx.innerHTML=av?esc(av.texto):(centro?'HOY HAY CENTRO DE DÍA':(cur?esc(cur.b.t):''));
   tx.style.display=sinAct?'none':'block';
-  sub.innerHTML=(!av&&cur&&cur.b.s)?esc(cur.b.s):'';
+  sub.innerHTML=(!av&&!centro&&cur&&cur.b.s)?esc(cur.b.s):'';
   sub.style.fontSize=Math.round(Math.min(ah*0.06,aw*0.03))+'px';
   c.innerHTML=cuentaTxt;
   c.style.fontSize=Math.round(Math.min(ah*(sinAct?0.16:0.115),aw*(sinAct?0.075:0.058)))+'px';
@@ -226,7 +224,7 @@ function renderAhora(){
     bi.style.width=Math.round(prog*100)+'%';
   }
   /* ajustar el texto de la actividad al hueco libre */
-  var libre=ah-(sinAct?0:t0.offsetHeight)-ico.offsetHeight-sub.offsetHeight-c.offsetHeight-(b.style.display==='none'?0:b.offsetHeight+Math.round(ah*0.015))-Math.round(L.H*0.03)-6;
+  var libre=ah-((sinAct||centro)?0:t0.offsetHeight)-ico.offsetHeight-sub.offsetHeight-c.offsetHeight-(b.style.display==='none'?0:b.offsetHeight+Math.round(ah*0.015))-Math.round(L.H*0.03)-6;
   if(!sinAct){
     var s=Math.min(ah*0.26,aw*0.11);tx.style.fontSize=Math.round(s)+'px';
     var g=0;while(tx.offsetHeight>libre&&s>14&&g++<80){s-=2;tx.style.fontSize=Math.round(s)+'px'}
@@ -264,9 +262,9 @@ function renderMsgs(){
   var ct=$('ct');ct.style.fontSize=Math.round(Math.min(ch*0.06,cw*0.055))+'px';
   var avail=ch-ct.offsetHeight-Math.min(W,H)*0.05;
   box.style.height=Math.max(40,avail)+'px';
-  if(!PC.configurado()){box.innerHTML='<div class="m"><div class="tx" style="font-size:'+Math.round(Math.min(W,H)*0.035)+'px;color:#78909C">Los mensajes aparecerán aquí.</div></div>';return}
+  if(!PC.configurado()){box.innerHTML='';return}
   var L2=msgs.filter(vivo).sort(function(a,b){return b.ts-a.ts});
-  if(!L2.length){box.innerHTML='<div class="m"><div class="tx" style="font-size:'+Math.round(Math.min(W,H)*0.04)+'px;color:#78909C">No hay mensajes nuevos.</div></div>';return}
+  if(!L2.length){box.innerHTML='';return}
   var base=Math.min(ch*0.11,cw*0.075),fs=base,out,k,n=Math.min(L2.length,8);
   function build(count,f){
     var h='',i,m,nuevo;
