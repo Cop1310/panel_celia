@@ -98,7 +98,7 @@ window.FESTIVOS_DEF=['2026-12-07','2026-12-08','2026-12-25',
 </script>
 <script>
 (function(){
-var VERSION='1.4';
+var VERSION='1.5';
 /* ---- ajustes fáciles de cambiar ---- */
 var NOCHE_INI=22*60;          /* 22:00 empieza la noche */
 var NOCHE_FIN=7*60+30;        /* 7:30 acaba la noche */
@@ -418,15 +418,19 @@ function getAudio(){
     return audioCtx;
   }catch(e){return null}
 }
+function nota(ac,out,f,t,dur,vol){
+  var o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=f;
+  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+0.015);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g);g.connect(out);o.start(t);o.stop(t+dur+0.05);
+}
+function campana(ac,out,f,t,dur,vol){nota(ac,out,f,t,dur,vol);nota(ac,out,f*2.01,t,dur*0.6,vol*0.35);nota(ac,out,f*3.0,t,dur*0.3,vol*0.15)}
+/* 3 notas descendentes (do-la-fa), grave y clara, 2 veces: ~5 s */
 function alarma5(){
   var ac=getAudio();if(!ac)return;
   try{
-    var t0=ac.currentTime+0.05,o=ac.createOscillator(),g=ac.createGain(),k;
-    o.type='square';
-    for(k=0;k<20;k++)o.frequency.setValueAtTime(k%2===0?988:740,t0+k*0.25);
-    g.gain.setValueAtTime(0.0001,t0);g.gain.linearRampToValueAtTime(0.6,t0+0.05);
-    g.gain.setValueAtTime(0.6,t0+4.85);g.gain.linearRampToValueAtTime(0.0001,t0+5);
-    o.connect(g);g.connect(ac.destination);o.start(t0);o.stop(t0+5.05);
+    var m=ac.createGain();m.gain.value=0.9;m.connect(ac.destination);
+    var t=ac.currentTime+0.05,k,b;
+    for(k=0;k<2;k++){b=t+k*2.5;campana(ac,m,523,b,0.9,0.7);campana(ac,m,440,b+0.5,0.9,0.7);campana(ac,m,349,b+1.0,1.5,0.7)}
   }catch(e){}
 }
 function pollSonido(){
