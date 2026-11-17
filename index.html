@@ -109,7 +109,7 @@ window.FESTIVOS_DEF=['2026-12-07','2026-12-08','2026-12-25',
 </script>
 <script>
 (function(){
-var VERSION='1.6';
+var VERSION='1.7';
 /* ---- ajustes fáciles de cambiar ---- */
 var NOCHE_INI=22*60;          /* 22:00 empieza la noche */
 var NOCHE_FIN=7*60+30;        /* 7:30 acaba la noche */
@@ -437,8 +437,34 @@ function nota(ac,out,f,t,dur,vol){
   o.connect(g);g.connect(out);o.start(t);o.stop(t+dur+0.05);
 }
 function campana(ac,out,f,t,dur,vol){nota(ac,out,f,t,dur,vol);nota(ac,out,f*2.01,t,dur*0.6,vol*0.35);nota(ac,out,f*3.0,t,dur*0.3,vol*0.15)}
-/* 3 notas descendentes (do-la-fa), grave y clara, 2 veces: ~5 s */
-function alarma5(){
+/* 3 notas descendentes (do-la-fa), grave y clara, 2 veces: ~5 s.
+   Se reproduce con un <audio> normal (Chrome es más permisivo en apps instaladas); si falla, con Web Audio. */
+var alarmaAudio=null;
+function sintetizaWav(){
+  var sr=22050,n=sr*5,d=new Float32Array(n),k,i,j;
+  var notas=[];
+  for(k=0;k<2;k++){var b=k*2.5;notas.push([523,b,0.9],[440,b+0.5,0.9],[349,b+1.0,1.5])}
+  notas.forEach(function(x){
+    var comps=[[x[0],x[2],0.7],[x[0]*2.01,x[2]*0.6,0.245],[x[0]*3,x[2]*0.3,0.105]];
+    comps.forEach(function(c){
+      var i0=Math.floor(x[1]*sr),len=Math.floor(c[1]*sr),w=2*Math.PI*c[0]/sr;
+      for(i=0;i<len&&i0+i<n;i++){
+        var t=i/sr,env=t<0.015?c[2]*(t/0.015):c[2]*Math.exp(Math.log(0.0001/c[2])*(t-0.015)/(c[1]-0.015));
+        d[i0+i]+=env*Math.sin(w*i);
+      }
+    });
+  });
+  var buf=new ArrayBuffer(44+n*2),v=new DataView(buf);
+  function str(o,t){for(var q=0;q<t.length;q++)v.setUint8(o+q,t.charCodeAt(q))}
+  str(0,'RIFF');v.setUint32(4,36+n*2,true);str(8,'WAVE');str(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);str(36,'data');v.setUint32(40,n*2,true);
+  for(j=0;j<n;j++){var y=d[j]*0.9;if(y>1)y=1;if(y<-1)y=-1;v.setInt16(44+j*2,y*32767,true)}
+  return new Blob([buf],{type:'audio/wav'});
+}
+function preparaAudio(){
+  try{alarmaAudio=new Audio(URL.createObjectURL(sintetizaWav()));alarmaAudio.preload='auto';alarmaAudio.volume=1}catch(e){alarmaAudio=null}
+}
+function alarmaWebAudio(){
   var ac=getAudio();if(!ac)return;
   try{
     var m=ac.createGain();m.gain.value=0.9;m.connect(ac.destination);
@@ -446,6 +472,18 @@ function alarma5(){
     for(k=0;k<2;k++){b=t+k*2.5;campana(ac,m,523,b,0.9,0.7);campana(ac,m,440,b+0.5,0.9,0.7);campana(ac,m,349,b+1.0,1.5,0.7)}
   }catch(e){}
 }
+function alarma5(){
+  if(alarmaAudio){
+    try{
+      alarmaAudio.currentTime=0;
+      var pr=alarmaAudio.play();
+      if(pr&&pr.catch)pr.catch(function(){alarmaWebAudio()});
+      return;
+    }catch(e){}
+  }
+  alarmaWebAudio();
+}
+preparaAudio();
 function pollSonido(){
   if(!PC.configurado())return;
   PC.xhr('GET',PC.url('sonido'),null,function(ok,j){
