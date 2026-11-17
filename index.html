@@ -35,13 +35,13 @@ body.noche #ahora .t0{color:#FFCCA6}
 #aico{line-height:1}
 #atxt{font-weight:800;line-height:1.12;color:#12294F}
 body.noche #atxt{color:#FFF}
-#cuenta{font-weight:800;line-height:1.1;color:#1B5E20}
+#cuenta{font-weight:800;line-height:1.1;color:#1B5E20;margin-top:.8vmin}
 body.noche #cuenta{color:#FFB74D}
 #barra{width:92%;margin-left:auto;margin-right:auto;border-radius:10px;background:#C8E6C9;overflow:hidden}
 body.noche #barra{background:#7A2B2B}
 #barraI{height:100%;width:0;background:#2E7D32;-webkit-transition:width 1s;transition:width 1s}
 body.noche #barraI{background:#FFB74D}
-#desp{color:#46597F;line-height:1.15}
+#desp{color:#46597F;line-height:1.15;font-weight:700}
 body.noche #desp{color:#FFCCA6}
 #chat{background:#FFFFFF;border:.5vmin solid #A5C7A8;border-radius:3vmin;padding:1.2vmin 1.6vmin}
 body.noche #chat{background:#4A1212;border-color:#8E3B3B}
@@ -70,7 +70,7 @@ body.noche .m.nuevo .de{color:#5D2A10}
 <div id="app">
   <div class="blk" id="bdia"><div id="dia"></div><div id="fl"></div><div id="rec"></div></div>
   <div class="blk" id="bhora"><div id="hm"></div><div id="per"></div></div>
-  <div class="blk" id="ahora"><div class="t0" id="t0">AHORA</div><div id="aico"></div><div id="atxt"></div><div id="cuenta"></div><div id="barra"><div id="barraI"></div></div><div id="desp"></div></div>
+  <div class="blk" id="ahora"><div class="t0" id="t0">AHORA</div><div id="aico"></div><div id="atxt"></div><div id="desp"></div><div id="cuenta"></div><div id="barra"><div id="barraI"></div></div></div>
   <div class="blk" id="chat"><div class="ct" id="ct">Mensajes de tu familia</div><div id="msgs"></div><div id="estado"></div></div>
   <div id="mask"></div>
   <div id="flash"><div class="fd" id="fd"></div><div class="ft" id="ft"></div><div class="fs">Toca la pantalla para continuar</div></div>
@@ -78,8 +78,27 @@ body.noche .m.nuevo .de{color:#5D2A10}
 <script src="firebase-config.js"></script>
 <script src="comun.js"></script>
 <script>
+/* Rutina por defecto de Celia (del Excel semanal) y festivos. Editable desde ajustes.html (se guarda en Firebase). */
 (function(){
-var VERSION='1.2';
+var T=[0,1,2,3,4,5,6],LV=[1,2,3,4,5],FS=[0,6];
+/* d=días (0=dom..6=sáb) · i=inicio · f=fin · t=texto · s=subtexto · ic=icono · c=1 → centro de día (panel en blanco) */
+window.RUTINA_DEF=[
+ {d:T, i:'22:00',f:'07:30',t:'A DORMIR',s:'Hasta las 7:30 no te levantes',ic:'😴'},
+ {d:T, i:'07:30',f:'08:30',t:'DESAYUNO',s:'Media pastilla de la tensión y la pastilla del ánimo',ic:'☕'},
+ {d:LV,i:'08:30',f:'17:00',t:'CENTRO DE DÍA',s:'',ic:'🏫',c:1},
+ {d:[0],i:'08:30',f:'10:00',t:'IR A MISA',s:'',ic:'⛪'},
+ {d:FS,i:'13:00',f:'14:00',t:'COMER',s:'',ic:'🍽️'},
+ {d:T, i:'20:00',f:'21:00',t:'CENAR',s:'',ic:'🍽️'},
+ {d:T, i:'21:00',f:'22:00',t:'PASTILLAS Y A DORMIR',s:'Media pastilla de la tensión y la pastilla de la memoria',ic:'💊'}
+];
+/* Festivos (nacionales + Comunidad de Madrid + Madrid capital). Revisar cada año en ajustes.html. */
+window.FESTIVOS_DEF=['2026-12-07','2026-12-08','2026-12-25',
+ '2027-01-01','2027-01-06','2027-03-19','2027-03-25','2027-03-26','2027-05-01','2027-05-15','2027-08-16','2027-10-12','2027-11-01','2027-11-09','2027-12-06','2027-12-08','2027-12-25'];
+})();
+</script>
+<script>
+(function(){
+var VERSION='1.3';
 /* ---- ajustes fáciles de cambiar ---- */
 var NOCHE_INI=22*60;          /* 22:00 empieza la noche */
 var NOCHE_FIN=7*60+30;        /* 7:30 acaba la noche */
@@ -110,7 +129,7 @@ function layout(){
   var bx,by,bw,bh,hx,hy,hw,hh,ax,ay,aw,ah,cx,cy,cw,ch;
   if(!land){
     bx=m;bw=W-2*m;hx=m;hw=bw;ax=m;aw=bw;cx=m;cw=bw;
-    by=m;bh=H*0.20;hy=by+bh;hh=H*0.15;ay=hy+hh+m;ah=H*0.32;cy=ay+ah+m;ch=H-cy-m;
+    by=m;bh=H*0.20;hy=by+bh;hh=H*0.15;ay=hy+hh+m;ah=H*0.36;cy=ay+ah+m;ch=H-cy-m;
   }else{
     var lw=W*0.56;
     bx=m;bw=lw-m;hx=m;hw=bw;ax=m;aw=bw;
@@ -136,49 +155,85 @@ function fmtDur(min){
   if(mi===0)return h+' h';
   return h+' h '+mi+' min';
 }
-/* cuenta atrás hasta la próxima rutina + barra de progreso */
-function renderCuenta(o,av,ah,aw){
-  var c=$('cuenta'),b=$('barra'),bi=$('barraI'),nx=o.next,cur=o.cur;
-  c.innerHTML='';b.style.display='none';
-  if(av||!nx)return;
-  var nm=minOf(nx.h);
-  if(nm===null)return;
-  var d=new Date(),now=d.getHours()*60+d.getMinutes()+d.getSeconds()/60;
-  var target=nm+(o.manana?1440:0),rest=target-now;
-  if(rest<0)rest+=1440;
-  c.innerHTML=(rest<=1?'Falta ':'Faltan ')+fmtDur(rest);
-  c.style.fontSize=Math.round(Math.min(ah*0.085,aw*0.048))+'px';
-  var cm=cur?minOf(cur.h):null;
-  if(cm===null)return;
-  var start=cm;
-  if(start>now)start-=1440;
-  var total=target-start;
-  if(total<=0)total+=1440;
-  var p=(now-start)/total;
-  if(p<0)p=0;if(p>1)p=1;
-  b.style.display='block';
-  b.style.height=Math.max(8,Math.round(ah*0.035))+'px';
-  b.style.marginTop=Math.round(ah*0.01)+'px';b.style.marginBottom=Math.round(ah*0.01)+'px';
-  bi.style.width=Math.round(p*100)+'%';
+/* ---- rutina (por defecto rutina.js; la familia la puede cambiar en ajustes.html → Firebase 'rutina' y 'festivos') ---- */
+var rutina=null,festivos=null;
+try{rutina=JSON.parse(ls('pc_rutina')||'null')}catch(e){}
+try{festivos=JSON.parse(ls('pc_festivos')||'null')}catch(e){}
+function arr(x){if(!x)return [];if(x.length!==undefined&&typeof x!=='string')return Array.prototype.slice.call(x);var r=[];for(var k in x)if(x.hasOwnProperty(k))r.push(x[k]);return r}
+function bloques(){var r=arr(rutina);return r.length?r:window.RUTINA_DEF}
+function esFestivo(d){var k=PC.iso(d),l=window.FESTIVOS_DEF.concat(arr(festivos));for(var i=0;i<l.length;i++)if(l[i]===k)return true;return false}
+function diaEf(d){var w=d.getDay();return esFestivo(d)?(w===0?0:6):w}
+/* segmentos en minutos desde las 0:00 de hoy (ayer, hoy, mañana y pasado) */
+function segmentos(now){
+  var out=[],bl=bloques();
+  for(var k=-1;k<=2;k++){
+    var dd=new Date(now.getFullYear(),now.getMonth(),now.getDate()+k,12,0,0),ef=diaEf(dd);
+    for(var j=0;j<bl.length;j++){
+      var b=bl[j],ds=arr(b.d),ok=false;
+      for(var q=0;q<ds.length;q++)if(Number(ds[q])===ef)ok=true;
+      if(!ok)continue;
+      var i=minOf(b.i),f=minOf(b.f);if(i===null||f===null)continue;
+      var len=f-i;if(len<=0)len+=1440;
+      out.push({a:k*1440+i,z:k*1440+i+len,b:b});
+    }
+  }
+  return out;
+}
+function situacion(now){
+  var m=now.getHours()*60+now.getMinutes()+now.getSeconds()/60,sg=segmentos(now),cur=null,nx=null,i;
+  for(i=0;i<sg.length;i++)if(sg[i].a<=m&&m<sg[i].z&&(!cur||sg[i].a>cur.a))cur=sg[i];
+  for(i=0;i<sg.length;i++){
+    var x=sg[i];
+    if(x.a>m&&(!cur||x.a>=cur.z)&&(!nx||x.a<nx.a))nx=x;
+  }
+  return {m:m,cur:cur,next:nx};
 }
 function renderAhora(){
-  var d=new Date(),o=PC.ahora(agenda,d),cur=o.cur,nx=o.next;
-  var av=(aviso&&aviso.texto)?aviso:null;
+  var d=new Date(),S=situacion(d),cur=S.cur,nx=S.next,av=(aviso&&aviso.texto)?aviso:null;
+  var centro=!!(cur&&cur.b.c)&&!av;
+  var sinAct=!cur&&!av;
   document.body.className=esNoche(d)?'noche':'dia';
-  $('ahora').className=av?'blk av':'blk';
-  $('t0').innerHTML=av?'AVISO':'AHORA';
   var box=$('ahora'),ah=box.clientHeight,aw=box.clientWidth,land=L.land;
-  $('t0').style.fontSize=Math.round(Math.min(ah*0.09,aw*0.045))+'px';
-  $('aico').innerHTML=av?esc(av.icono||''):(cur&&cur.i?cur.i:'');
-  $('aico').style.fontSize=Math.round(Math.min(ah*(land?0.20:0.17),aw*0.12))+'px';
-  $('desp').innerHTML=(nx&&!av)?('Después, '+(PC.h12(parseInt(nx.h,10))===1?'a la ':'a las ')+PC.hmFull(nx.h)+(o.manana?' (mañana)':'')+': '+esc(nx.t)):'';
-  $('desp').style.fontSize=Math.round(Math.min(ah*0.07,aw*0.036))+'px';
-  renderCuenta(o,av,ah,aw);
-  var extra=$('cuenta').offsetHeight+($('barra').style.display==='none'?0:$('barra').offsetHeight+Math.round(ah*0.02));
-  var tx=$('atxt');tx.innerHTML=av?esc(av.texto):(cur?cur.t:'');
-  var libre=ah-$('t0').offsetHeight-$('aico').offsetHeight-$('desp').offsetHeight-extra-Math.round(L.H*0.03)-6;
-  var s=Math.min(ah*0.28,aw*0.12);tx.style.fontSize=Math.round(s)+'px';
-  var g=0;while(tx.offsetHeight>libre&&s>14&&g++<80){s-=2;tx.style.fontSize=Math.round(s)+'px'}
+  $('ahora').className=av?'blk av':'blk';
+  box.style.visibility=centro?'hidden':'visible';
+  if(centro){applyMask();return}
+  /* texto principal */
+  var t0=$('t0'),ico=$('aico'),tx=$('atxt'),c=$('cuenta'),b=$('barra'),bi=$('barraI'),sub=$('desp');
+  var cuentaTxt='',prog=null,mostrarCuenta=!av&&!!nx;
+  if(mostrarCuenta){
+    var rest=nx.a-S.m;
+    cuentaTxt=(rest<=1?'Falta ':'Faltan ')+fmtDur(rest)+' para '+esc(nx.b.t);
+    if(cur){var tot=nx.a-cur.a;if(tot>0){prog=(S.m-cur.a)/tot;prog=Math.max(0,Math.min(1,prog))}}
+  }
+  t0.innerHTML=av?'AVISO':(sinAct?'':'AHORA');
+  t0.style.display=sinAct?'none':'block';
+  t0.style.fontSize=Math.round(Math.min(ah*0.08,aw*0.04))+'px';
+  var icoTxt=av?esc(av.icono||''):(cur?cur.b.ic||'':(nx?nx.b.ic||'':''));
+  ico.innerHTML=icoTxt;
+  ico.style.fontSize=Math.round(Math.min(ah*(land?0.17:0.14),aw*0.10))+'px';
+  tx.innerHTML=av?esc(av.texto):(cur?esc(cur.b.t):'');
+  tx.style.display=sinAct?'none':'block';
+  sub.innerHTML=(!av&&cur&&cur.b.s)?esc(cur.b.s):'';
+  sub.style.fontSize=Math.round(Math.min(ah*0.06,aw*0.03))+'px';
+  c.innerHTML=cuentaTxt;
+  c.style.fontSize=Math.round(Math.min(ah*(sinAct?0.16:0.115),aw*(sinAct?0.075:0.058)))+'px';
+  c.style.display=cuentaTxt?'block':'none';
+  if(prog===null){b.style.display='none'}
+  else{
+    b.style.display='block';
+    b.style.height=Math.max(12,Math.round(ah*0.07))+'px';
+    b.style.marginTop=Math.round(ah*0.015)+'px';
+    bi.style.width=Math.round(prog*100)+'%';
+  }
+  /* ajustar el texto de la actividad al hueco libre */
+  var libre=ah-(sinAct?0:t0.offsetHeight)-ico.offsetHeight-sub.offsetHeight-c.offsetHeight-(b.style.display==='none'?0:b.offsetHeight+Math.round(ah*0.015))-Math.round(L.H*0.03)-6;
+  if(!sinAct){
+    var s=Math.min(ah*0.26,aw*0.11);tx.style.fontSize=Math.round(s)+'px';
+    var g=0;while(tx.offsetHeight>libre&&s>14&&g++<80){s-=2;tx.style.fontSize=Math.round(s)+'px'}
+  }else{
+    var s2=parseInt(c.style.fontSize,10),g2=0;
+    while(c.offsetHeight>ah-ico.offsetHeight-12&&s2>14&&g2++<60){s2-=2;c.style.fontSize=s2+'px'}
+  }
   applyMask();
 }
 function renderFecha(){
@@ -343,6 +398,17 @@ function pollRec(){
     ls('pc_rec',JSON.stringify(rec));renderRec();
   });
 }
+function pollRutina(){
+  if(!PC.configurado())return;
+  PC.xhr('GET',PC.url('rutina'),null,function(ok,j){
+    if(!ok)return;
+    rutina=(j&&typeof j==='object')?j:null;ls('pc_rutina',JSON.stringify(rutina));renderAhora();
+  });
+  PC.xhr('GET',PC.url('festivos'),null,function(ok,j){
+    if(!ok)return;
+    festivos=(j&&typeof j==='object')?j:null;ls('pc_festivos',JSON.stringify(festivos));
+  });
+}
 function pollAgenda(){
   if(!PC.configurado())return;
   PC.xhr('GET',PC.url('agenda'),null,function(ok,j){
@@ -380,9 +446,9 @@ setInterval(renderEstado,5000);
 setInterval(applyMask,5000);
 /* la cuenta atrás y la barra se refrescan cada 20 s */
 setInterval(renderAhora,20000);
-pollAgenda();pollMsgs();pollAviso();pollAlerta();pollRec();heartbeat();
+pollAgenda();pollRutina();pollMsgs();pollAviso();pollAlerta();pollRec();heartbeat();
 setInterval(function(){pollMsgs();pollAviso();pollAlerta();pollRec()},6000);
-setInterval(pollAgenda,60000);
+setInterval(pollAgenda,60000);setInterval(pollRutina,60000);
 setInterval(heartbeat,60000);
 
 /* pantalla encendida (si el navegador lo permite) */

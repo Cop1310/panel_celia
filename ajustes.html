@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ajustes del panel de Celia</title>
+<style>
+body{font-family:Roboto,Arial,sans-serif;margin:0;padding:14px;background:#F3F7F3;color:#1B2A4A;max-width:900px;margin:auto}
+h1{font-size:22px}h2{font-size:18px;margin-top:26px}
+.card{background:#fff;border:1px solid #cfd8cf;border-radius:10px;padding:12px;margin-bottom:12px}
+input[type=text],input[type=time],textarea{font-size:16px;padding:8px;border:1px solid #9aa;border-radius:6px;width:100%;box-sizing:border-box}
+button{font-size:16px;padding:10px 16px;border:0;border-radius:8px;background:#2E7D32;color:#fff;margin:6px 6px 0 0}
+button.g{background:#78909C}button.r{background:#C62828}
+.b{border:1px solid #cfd8cf;border-radius:8px;padding:8px;margin-bottom:10px;background:#FAFDFA}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}.row>div{flex:1;min-width:110px}
+label.d{display:inline-block;margin-right:8px;font-size:15px}
+small{color:#566}#ok{position:fixed;bottom:10px;left:10px;right:10px;background:#1B5E20;color:#fff;padding:10px;border-radius:8px;display:none;text-align:center}
+</style></head><body>
+<h1>Panel de Celia · ajustes</h1>
+
+<h2>Nota bajo la fecha</h2>
+<div class="card"><small>Ej.: «Hoy es el cumpleaños de Emma». Se ve bajo la fecha grande hasta que la borréis.</small>
+<input type="text" id="rec" maxlength="60" placeholder="Hoy es el cumpleaños de ...">
+<button onclick="saveRec()">Guardar nota</button><button class="g" onclick="document.getElementById('rec').value='';saveRec()">Borrar nota</button></div>
+
+<h2>Rutina diaria</h2>
+<div class="card"><small>Días: D=domingo … S=sábado. Si el bloque acaba antes de empezar, pasa la medianoche. «Centro de día» deja el panel en blanco. Los festivos se tratan como sábado.</small>
+<div id="bl"></div>
+<button class="g" onclick="addB()">+ Añadir bloque</button>
+<button onclick="saveR()">Guardar rutina</button>
+<button class="r" onclick="resetR()">Volver a la rutina original</button></div>
+
+<h2>Festivos extra (un YYYY-MM-DD por línea)</h2>
+<div class="card"><small>Se suman a los festivos ya incluidos (nacionales, Comunidad de Madrid y Madrid capital hasta 2027).</small>
+<textarea id="fe" rows="5"></textarea><button onclick="saveF()">Guardar festivos</button></div>
+<div id="ok"></div>
+<script src="firebase-config.js"></script><script src="comun.js"></script><script>
+/* Rutina por defecto de Celia (del Excel semanal) y festivos. Editable desde ajustes.html (se guarda en Firebase). */
+(function(){
+var T=[0,1,2,3,4,5,6],LV=[1,2,3,4,5],FS=[0,6];
+/* d=días (0=dom..6=sáb) · i=inicio · f=fin · t=texto · s=subtexto · ic=icono · c=1 → centro de día (panel en blanco) */
+window.RUTINA_DEF=[
+ {d:T, i:'22:00',f:'07:30',t:'A DORMIR',s:'Hasta las 7:30 no te levantes',ic:'😴'},
+ {d:T, i:'07:30',f:'08:30',t:'DESAYUNO',s:'Media pastilla de la tensión y la pastilla del ánimo',ic:'☕'},
+ {d:LV,i:'08:30',f:'17:00',t:'CENTRO DE DÍA',s:'',ic:'🏫',c:1},
+ {d:[0],i:'08:30',f:'10:00',t:'IR A MISA',s:'',ic:'⛪'},
+ {d:FS,i:'13:00',f:'14:00',t:'COMER',s:'',ic:'🍽️'},
+ {d:T, i:'20:00',f:'21:00',t:'CENAR',s:'',ic:'🍽️'},
+ {d:T, i:'21:00',f:'22:00',t:'PASTILLAS Y A DORMIR',s:'Media pastilla de la tensión y la pastilla de la memoria',ic:'💊'}
+];
+/* Festivos (nacionales + Comunidad de Madrid + Madrid capital). Revisar cada año en ajustes.html. */
+window.FESTIVOS_DEF=['2026-12-07','2026-12-08','2026-12-25',
+ '2027-01-01','2027-01-06','2027-03-19','2027-03-25','2027-03-26','2027-05-01','2027-05-15','2027-08-16','2027-10-12','2027-11-01','2027-11-09','2027-12-06','2027-12-08','2027-12-25'];
+})();
+</script>
+<script>
+var DN=['D','L','M','X','J','V','S'],B=[];
+function $(i){return document.getElementById(i)}
+function arr(x){if(!x)return [];if(x.length!==undefined&&typeof x!=='string')return Array.prototype.slice.call(x);var r=[];for(var k in x)if(x.hasOwnProperty(k))r.push(x[k]);return r}
+function msg(t){var o=$('ok');o.textContent=t;o.style.display='block';setTimeout(function(){o.style.display='none'},2500)}
+function esc(s){return String(s==null?'':s).replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+function draw(){
+  var h='';
+  B.forEach(function(b,k){
+    var ds=arr(b.d).map(Number),dh='';
+    for(var i=0;i<7;i++)dh+='<label class="d"><input type="checkbox" data-k="'+k+'" data-d="'+i+'"'+(ds.indexOf(i)>=0?' checked':'')+'> '+DN[i]+'</label>';
+    h+='<div class="b"><div>'+dh+'</div><div class="row"><div><small>Desde</small><input type="time" data-k="'+k+'" data-f="i" value="'+esc(b.i)+'"></div><div><small>Hasta</small><input type="time" data-k="'+k+'" data-f="f" value="'+esc(b.f)+'"></div><div><small>Icono</small><input type="text" data-k="'+k+'" data-f="ic" value="'+esc(b.ic)+'"></div></div>'+
+    '<div class="row"><div style="flex:2"><small>Texto grande</small><input type="text" data-k="'+k+'" data-f="t" value="'+esc(b.t)+'"></div><div style="flex:3"><small>Texto pequeño (pastillas…)</small><input type="text" data-k="'+k+'" data-f="s" value="'+esc(b.s)+'"></div></div>'+
+    '<label class="d"><input type="checkbox" data-k="'+k+'" data-f="c"'+(b.c?' checked':'')+'> Centro de día (panel en blanco)</label> <button class="r" onclick="delB('+k+')">Quitar</button></div>';
+  });
+  $('bl').innerHTML=h;
+}
+function collect(){
+  var els=document.querySelectorAll('#bl [data-k]');
+  B.forEach(function(b){b.d=[]});
+  Array.prototype.forEach.call(els,function(e){
+    var b=B[+e.getAttribute('data-k')],f=e.getAttribute('data-f'),d=e.getAttribute('data-d');
+    if(d!==null){if(e.checked)b.d.push(+d)}
+    else if(f==='c'){b.c=e.checked?1:0}
+    else b[f]=e.value;
+  });
+}
+function addB(){collect();B.push({d:[1,2,3,4,5],i:'12:00',f:'13:00',t:'',s:'',ic:''});draw()}
+function delB(k){collect();B.splice(k,1);draw()}
+function saveR(){collect();
+  for(var i=0;i<B.length;i++){if(!B[i].t||!B[i].i||!B[i].f||!B[i].d.length){alert('Faltan datos en el bloque '+(i+1)+' (texto, horas o días)');return}}
+  PC.xhr('PUT',PC.url('rutina'),B,function(ok){msg(ok?'Rutina guardada. El panel la coge en 1 minuto.':'ERROR al guardar')})}
+function resetR(){if(!confirm('¿Volver a la rutina original?'))return;PC.xhr('DELETE',PC.url('rutina'),null,function(ok){B=JSON.parse(JSON.stringify(RUTINA_DEF));draw();msg(ok?'Restaurada':'ERROR')})}
+function saveRec(){var t=$('rec').value.replace(/^\s+|\s+$/g,'');
+  PC.xhr('PUT',PC.url('recordatorio'),t?{texto:t,ts:{'.sv':'timestamp'}}:null,function(ok){msg(ok?(t?'Nota guardada':'Nota borrada'):'ERROR al guardar')})}
+function saveF(){var l=$('fe').value.split(/\s+/).filter(function(x){return /^\d{4}-\d{2}-\d{2}$/.test(x)});
+  PC.xhr('PUT',PC.url('festivos'),l.length?l:null,function(ok){msg(ok?'Festivos guardados':'ERROR')})}
+B=JSON.parse(JSON.stringify(RUTINA_DEF));draw();
+if(PC.configurado()){
+  PC.xhr('GET',PC.url('rutina'),null,function(ok,j){var r=arr(j);if(ok&&r.length){B=r.map(function(b){b.d=arr(b.d);return b});draw()}});
+  PC.xhr('GET',PC.url('recordatorio'),null,function(ok,j){if(ok&&j&&j.texto)$('rec').value=j.texto});
+  PC.xhr('GET',PC.url('festivos'),null,function(ok,j){if(ok)$('fe').value=arr(j).join('\n')});
+}
+</script></body></html>
