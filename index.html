@@ -107,7 +107,8 @@ var T=[0,1,2,3,4,5,6],LV=[1,2,3,4,5],FS=[0,6];
 /* d=días (0=dom..6=sáb) · i=inicio · f=fin · t=texto · s=subtexto · ic=icono · c=1 → centro de día (panel en blanco) */
 window.RUTINA_DEF=[
  {d:T, i:'22:00',f:'07:30',t:'A DORMIR',s:'Hasta las 7:30 no te levantes',ic:'😴'},
- {d:T, i:'07:30',f:'08:30',t:'DESAYUNO',s:'Media pastilla de la tensión y la pastilla del ánimo',ic:'☕'},
+ {d:[1,2,3,4,5,6],i:'07:30',f:'08:30',t:'DESAYUNO',s:'Media pastilla de la tensión y la pastilla del ánimo',ic:'☕'},
+ {d:[0],i:'07:30',f:'08:00',t:'DESAYUNO',s:'Media pastilla de la tensión y la pastilla del ánimo',ic:'☕'},
  {d:LV,i:'08:30',f:'17:00',t:'CENTRO DE DÍA',s:'',ic:'🏫',c:1},
  {d:[0],i:'08:30',f:'10:00',t:'IR A MISA',s:'',ic:'⛪'},
  {d:FS,i:'13:00',f:'14:00',t:'COMER',s:'',ic:'🍽️'},
@@ -121,7 +122,7 @@ window.FESTIVOS_DEF=['2026-12-07','2026-12-08','2026-12-25',
 </script>
 <script>
 (function(){
-var VERSION='1.9';
+var VERSION='2.0';
 /* ---- ajustes fáciles de cambiar ---- */
 var NOCHE_INI=22*60;          /* 22:00 empieza la noche */
 var NOCHE_FIN=7*60+30;        /* 7:30 acaba la noche */
@@ -246,10 +247,25 @@ function faltaTxt(min,para){
   return (sing?'Falta ':'Faltan ')+t+' '+para;
 }
 function horaTxt(am){var h=Math.floor(am/60)%24,mi=am%60;return PC.h12(h)+':'+PC.pad(mi)+' '+PC.periodo(h)}
+/* mensaje de espera en los ratos libres (sin contador): texto grande, hora clave en rojo */
+function esperaTxt(nx,d){
+  var h=Math.floor(nx.a/60)%24,mi=nx.a%60,h12=PC.h12(h);
+  var hora=PC.h12(h)+':'+PC.pad(mi),art=(h12===1?'LA ':'LAS ');
+  var col=tema(d)==='noche'?'#FF8A80':'#C62828';
+  var R=function(t){return '<span style="color:'+col+'">'+t+'</span>'};
+  var n=String(nx.b.t||'').toUpperCase(),fin;
+  if(n==='CENAR')return 'PARA CENAR ESPERA '+R('HASTA '+art+hora)+' PARA QUE NO SE TE HAGA MUY LARGA LA NOCHE';
+  if(n==='COMER')return 'PARA COMER ESPERA '+R('HASTA '+art+hora)+' PORQUE TODAVÍA ES PRONTO';
+  if(n==='IR A MISA')return 'ESPERA '+R('HASTA '+art+hora)+' PARA IR A MISA PORQUE AÚN NO HA ABIERTO LA IGLESIA DE SAN MATEO';
+  return 'A CONTINUACIÓN: '+esc(nx.b.t)+' '+R('A '+art+hora);
+}
 function renderAhora(){
   var d=new Date(),S=situacion(d),cur=S.cur,nx=S.next,av=(aviso&&aviso.texto)?aviso:null;
   var centro=!!(cur&&cur.b.c)&&!av;
   var sinAct=!cur&&!av;
+  var espera=sinAct&&!!nx;
+  var noch=!!(cur&&minOf(cur.b.i)>minOf(cur.b.f));
+  var conBarra=!av&&!!cur&&(centro||noch||!!(nx&&nx.b.c));
   document.body.className=tema(d);
   var box=$('ahora'),ah=box.clientHeight,aw=box.clientWidth,land=L.land;
   $('ahora').className=av?'blk av':'blk';
@@ -257,22 +273,23 @@ function renderAhora(){
   var t0=$('t0'),ico=$('aico'),tx=$('atxt'),c=$('cuenta'),b=$('barra'),bi=$('barraI'),sub=$('desp'),row=$('brow'),bo=$('bola'),i0=$('bi0'),i1=$('bi1');
   /* cuenta atrás y barra */
   var cuentaTxt='',prog=null,left='',right='';
-  if(!av&&(centro||nx)){
+  if(conBarra){
     var endT=centro?cur.z:nx.a,para=centro?'para volver a casa':(nx.b.c?'para ir al centro de día':'para '+esc(nx.b.t));
     var start=cur?cur.a:(S.prevEnd!==null?S.prevEnd:endT-240);
     cuentaTxt=faltaTxt(endT-S.m,para);
     var tot=endT-start;if(tot>0){prog=(S.m-start)/tot;prog=Math.max(0,Math.min(1,prog))}
-    left=cur?(cur.b.ic||''):'🏠';
+    left=cur.b.ic||'';
     right=centro?'🏠':(nx?(nx.b.ic||''):'');
   }
   t0.innerHTML=av?'AVISO':'AHORA';
   t0.style.display=(sinAct||centro)?'none':'block';
   t0.style.fontSize=Math.round(Math.min(ah*0.07,aw*0.04)*z)+'px';
-  ico.innerHTML=av?esc(av.icono||''):(sinAct?'':(cur.b.ic||''));
+  ico.innerHTML=av?esc(av.icono||''):(espera?(nx.b.ic||''):(sinAct?'':(cur.b.ic||'')));
   ico.style.display=ico.innerHTML?'block':'none';
-  ico.style.fontSize=Math.round(Math.min(ah*(centro?0.20:0.15)*z,aw*0.2))+'px';
-  tx.innerHTML=av?esc(av.texto):(centro?'HOY HAY CENTRO DE DÍA':(cur?esc(cur.b.t):''));
-  tx.style.display=sinAct?'none':'block';
+  ico.style.fontSize=Math.round(Math.min(ah*(centro?0.20:(espera?0.12:0.15))*z,aw*0.2))+'px';
+  tx.style.lineHeight=espera?'1.12':'';
+  tx.innerHTML=av?esc(av.texto):(centro?'HOY HAY CENTRO DE DÍA':(espera?esperaTxt(nx,d):(cur?esc(cur.b.t):'')));
+  tx.style.display=(sinAct&&!espera)?'none':'block';
   var subT=(!av&&centro)?('Hasta las '+horaTxt(cur.z)):((!av&&cur&&cur.b.s)?esc(cur.b.s):'');
   sub.innerHTML=subT;sub.style.display=subT?'block':'none';
   sub.style.fontSize=Math.round(Math.min(ah*0.055*z,aw*0.04))+'px';
@@ -291,15 +308,15 @@ function renderAhora(){
   }
   /* ajustar el texto de la actividad al hueco libre */
   var libre=ah-((sinAct||centro)?0:t0.offsetHeight)-(ico.style.display==='none'?0:ico.offsetHeight)-(sub.style.display==='none'?0:sub.offsetHeight)-(c.style.display==='none'?0:c.offsetHeight)-(row.style.display==='none'?0:row.offsetHeight+10)-Math.round(L.H*0.05)-6;
-  if(!sinAct){
-    var s=Math.min(ah*0.22*z,aw*0.13);tx.style.fontSize=Math.round(s)+'px';
+  if(!sinAct||espera){
+    var s=espera?aw*0.14:Math.min(ah*0.22*z,aw*0.13);tx.style.fontSize=Math.round(s)+'px';
     var g=0;while(tx.offsetHeight>libre&&s>14&&g++<80){s-=2;tx.style.fontSize=Math.round(s)+'px'}
   }else{
     var s2=parseInt(c.style.fontSize,10),g2=0;
     while(c.offsetHeight>ah-row.offsetHeight-30&&s2>14&&g2++<60){s2-=2;c.style.fontSize=s2+'px'}
   }
   var sol=$('sol'),tm=tema(d),hh=d.getHours();
-  if(tm==='noche'&&!av){
+  if(tm==='noche'&&!av&&noch){
     var dia=(hh>=21)?new Date(d.getFullYear(),d.getMonth(),d.getDate()+1,12):d;
     var am=amanecerMin(dia);
     sol.innerHTML='🌅 '+(hh>=21?'Mañana':'Hoy')+' amanece a las '+PC.h12(Math.floor(am/60))+':'+PC.pad(am%60);
