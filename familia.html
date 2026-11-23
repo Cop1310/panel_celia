@@ -154,12 +154,13 @@ var T=[0,1,2,3,4,5,6],LV=[1,2,3,4,5],FS=[0,6];
 /* d=días (0=dom..6=sáb) · i=inicio · f=fin · t=texto · s=subtexto · ic=icono · c=1 → centro de día (panel en blanco) */
 window.RUTINA_DEF=[
  {d:T, i:'22:00',f:'07:30',t:'A DORMIR',s:'Hasta las 7:30 no te levantes',ic:'😴'},
- {d:T, i:'07:30',f:'08:30',t:'DESAYUNO',s:'Media pastilla de la tensión y la pastilla del ánimo',ic:'☕'},
+ {d:[1,2,3,4,5,6],i:'07:30',f:'08:30',t:'DESAYUNO',s:'Media pastilla de la tensión y la pastilla del ánimo',ic:'☕'},
+ {d:[0],i:'07:30',f:'08:00',t:'DESAYUNO',s:'Media pastilla de la tensión y la pastilla del ánimo',ic:'☕'},
  {d:LV,i:'08:30',f:'17:00',t:'CENTRO DE DÍA',s:'',ic:'🏫',c:1},
  {d:[0],i:'08:30',f:'10:00',t:'IR A MISA',s:'',ic:'⛪'},
  {d:FS,i:'13:00',f:'14:00',t:'COMER',s:'',ic:'🍽️'},
  {d:T, i:'20:00',f:'21:00',t:'CENAR',s:'',ic:'🍽️'},
- {d:T, i:'21:00',f:'22:00',t:'PASTILLAS Y A DORMIR',s:'Media pastilla de la tensión y la pastilla de la memoria',ic:'💊'}
+ {d:T, i:'21:00',f:'22:00',t:'PASTILLAS Y A DORMIR',s:'Ya en la cama: media pastilla de la tensión y la pastilla de la memoria',ic:'🛏️'}
 ];
 /* Festivos (nacionales + Comunidad de Madrid + Madrid capital). Revisar cada año en ajustes.html. */
 window.FESTIVOS_DEF=['2026-12-07','2026-12-08','2026-12-25',
