@@ -126,7 +126,7 @@ window.FESTIVOS_DEF=['2026-12-07','2026-12-08','2026-12-25',
 </script>
 <script>
 (function(){
-var VERSION='2.2';
+var VERSION='2.3';
 /* ---- ajustes fáciles de cambiar ---- */
 var NOCHE_INI=21*60;          /* 21:00 empieza la noche (máscara) */
 var NOCHE_FIN=7*60+30;        /* 7:30 acaba la noche */
@@ -166,8 +166,16 @@ function esperaOk(S){
   return (n==='CENAR'&&ant<=60)||(n==='IR A MISA'&&ant<=30);
 }
 /* sin aviso ni actividad ni mensaje de espera → día y hora a pantalla completa */
+/* visita de la chica del ayuntamiento: martes de 17:00 a 18:30 */
+function visitaTxt(d){
+  var m=d.getHours()*60+d.getMinutes();
+  if(d.getDay()!==2||m<17*60||m>=18*60+30)return '';
+  var R='<span style="color:#C62828">';
+  return 'HOY VIENE LA CHICA DEL AYUNTAMIENTO '+R+'A LAS 6:00</span> Y SE QUEDA '+R+'HASTA LAS 8:00</span>';
+}
 function esVacio(d){
   if(aviso&&aviso.texto)return false;
+  if(visitaTxt(d))return false;
   var S=situacion(d);
   return !S.cur&&!esperaOk(S);
 }
@@ -314,7 +322,8 @@ function renderAhora(){
   var d=new Date(),S=situacion(d),cur=S.cur,nx=S.next,av=(aviso&&aviso.texto)?aviso:null;
   var centro=!!(cur&&cur.b.c)&&!av;
   var sinAct=!cur&&!av;
-  var espera=sinAct&&esperaOk(S);
+  var vis=(!av&&!cur)?visitaTxt(d):'';
+  var espera=sinAct&&(esperaOk(S)||!!vis);
   var pasti=!av&&!!cur&&/^PASTILLAS/.test(String(cur.b.t||'').toUpperCase());
   var noch=!!(cur&&minOf(cur.b.i)>minOf(cur.b.f));
   var conBarra=!av&&!!cur&&!centro&&(noch||!!(nx&&nx.b.c));
@@ -336,11 +345,11 @@ function renderAhora(){
   t0.innerHTML=av?'AVISO':'AHORA';
   t0.style.display=(sinAct||centro||pasti)?'none':'block';
   t0.style.fontSize=Math.round(Math.min(ah*0.07,aw*0.04)*z)+'px';
-  ico.innerHTML=av?esc(av.icono||''):(espera?(nx.b.ic||''):(pasti?'🛏️':(sinAct?'':(cur.b.ic||''))));
+  ico.innerHTML=av?esc(av.icono||''):(espera?(vis?'🧹':(nx.b.ic||'')):(pasti?'🛏️':(sinAct?'':(cur.b.ic||''))));
   ico.style.display=ico.innerHTML?'block':'none';
   ico.style.fontSize=Math.round(Math.min(ah*(centro?0.15:((espera||pasti)?0.12:0.15))*z,aw*0.2))+'px';
   tx.style.lineHeight=(espera||pasti)?'1.12':'';
-  tx.innerHTML=av?esc(av.texto):(centro?'HOY HAY CENTRO DE DÍA':(espera?esperaTxt(nx,d):(pasti?nocheTxt(S.m):(cur?esc(cur.b.t):''))));
+  tx.innerHTML=av?esc(av.texto):(centro?'HOY HAY CENTRO DE DÍA':(espera?(vis||esperaTxt(nx,d)):(pasti?nocheTxt(S.m):(cur?esc(cur.b.t):''))));
   tx.style.display=(sinAct&&!espera)?'none':'block';
   var subT=(!av&&centro)?('Hasta las '+horaTxt(cur.z)):(pasti?'Ya en la cama: media pastilla de la tensión y la pastilla de la memoria':((!av&&cur&&cur.b.s)?esc(cur.b.s):''));
   sub.innerHTML=subT;sub.style.display=subT?'block':'none';
